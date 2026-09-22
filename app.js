@@ -46,22 +46,8 @@ function renderAuthArea(){
 }
 
 function signIn(){
-  // Redirect-based sign-in — works around Chrome's COOP popup blocking
-  return auth.signInWithRedirect(googleProvider).catch(err => toast('Sign-in failed: ' + err.message));
+  return auth.signInWithPopup(googleProvider).catch(err => toast('Sign-in failed: ' + err.message));
 }
-
-// ---------- Handle redirect result ----------
-auth.getRedirectResult()
-  .then(result => {
-    if (result && result.user) {
-      toast('Signed in — you can download now.');
-    }
-  })
-  .catch(err => {
-    if (err && err.code && err.code !== 'auth/no-auth-event') {
-      toast('Sign-in failed: ' + err.message);
-    }
-  });
 
 auth.onAuthStateChanged(user => {
   currentUser = user;
@@ -71,9 +57,12 @@ auth.onAuthStateChanged(user => {
 // ---------- Login-required modal ----------
 const loginOverlay = document.getElementById('loginOverlay');
 document.getElementById('modalCloseBtn').onclick = () => loginOverlay.classList.add('hidden');
-document.getElementById('modalGoogleBtn').onclick = () => {
-  // Redirect will navigate away; on return onAuthStateChanged will fire.
-  signIn();
+document.getElementById('modalGoogleBtn').onclick = async () => {
+  await signIn();
+  if (auth.currentUser){
+    loginOverlay.classList.add('hidden');
+    toast('Signed in — you can download now.');
+  }
 };
 
 // ---------- Data ----------
@@ -93,7 +82,6 @@ db.collection('sfx').orderBy('uploadedAt', 'desc').onSnapshot(snap => {
   buildCategoryChips();
   render();
 }, err => {
-  console.error('Library load failed:', err.code, err.message);
   document.getElementById('sfxGrid').innerHTML = `<div class="empty"><b>Couldn't load the library</b>${err.message}</div>`;
 });
 
