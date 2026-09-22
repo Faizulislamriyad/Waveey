@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waveform — Sound Effects Library</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="ambient"><span></span><span></span></div>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="mark"><i></i><i></i><i></i><i></i></span>
+    Waveform
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
+    <a class="btn ghost small" href="admin.html">Admin</a>
+    <div id="authArea"></div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-copy">
+    <div class="eyebrow">Sound effects, ready to drop in</div>
+    <h1>Every click, whoosh and <span class="grad">hit</span>, in one place.</h1>
+    <p>A growing library of sound effects for editors and creators. Preview instantly, sign in with Google, and download the ones your project needs.</p>
+    <div class="hero-stats">
+      <div><b id="statCount">0</b><span>sounds available</span></div>
+      <div><b id="statCat">0</b><span>categories</span></div>
+    </div>
+  </div>
+  <div class="wave-visual">
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="bars">
+      <i style="height:20px;animation-delay:-1.4s"></i>
+      <i style="height:50px;animation-delay:-1.1s"></i>
+      <i style="height:75px;animation-delay:-.8s"></i>
+      <i style="height:40px;animation-delay:-1.6s"></i>
+      <i style="height:90px;animation-delay:-.5s"></i>
+      <i style="height:35px;animation-delay:-1s"></i>
+      <i style="height:60px;animation-delay:-.3s"></i>
+      <i style="height:25px;animation-delay:-1.3s"></i>
+    </div>
+  </div>
+</section>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="Search sound effects…">
+  </div>
+  <div class="chip-row" id="categoryChips">
+    <button class="chip active" data-cat="all">All</button>
+  </div>
+</div>
+
+<main class="grid" id="sfxGrid">
+  <div class="empty"><b>Loading library…</b>Fetching sounds from the cloud.</div>
+</main>
+
+<footer>Waveform SFX Library — built with Firebase</footer>
+
+<!-- Sign-in required modal -->
+<div class="overlay hidden" id="loginOverlay">
+  <div class="modal">
+    <h3>Sign in to download</h3>
+    <p>Downloads are free for everyone — just sign in with Google so we can keep the library fair for all creators.</p>
+    <button class="btn primary" id="modalGoogleBtn" style="width:100%;justify-content:center">Continue with Google</button>
+    <button class="btn ghost" id="modalCloseBtn" style="width:100%;justify-content:center;margin-top:10px">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

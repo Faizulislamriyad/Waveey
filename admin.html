@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Waveform</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="ambient"><span></span><span></span></div>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="mark"><i></i><i></i><i></i><i></i></span>
+    Waveform <span style="color:var(--text-faint);font-weight:500;font-size:.9rem;margin-left:6px">Admin</span>
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
+    <a class="btn ghost small" href="index.html">← Back to site</a>
+    <div id="authArea"></div>
+  </div>
+</nav>
+
+<!-- Not signed in -->
+<div class="gate" id="gateSignedOut">
+  <h2>Admin access</h2>
+  <p>Sign in with your Google admin account to upload and manage sound effects.</p>
+  <button class="btn primary" id="gateSignInBtn">Continue with Google</button>
+</div>
+
+<!-- Signed in, not an admin -->
+<div class="gate hidden" id="gateDenied">
+  <h2>Not authorized</h2>
+  <p>This account doesn't have admin access. Ask an existing admin to add your email to the <b>admins</b> collection in Firestore.</p>
+  <button class="btn ghost" id="denySignOutBtn">Sign out</button>
+</div>
+
+<!-- Admin dashboard -->
+<div class="admin-wrap hidden" id="dashboard">
+
+  <div class="panel">
+    <h2>Upload a new sound</h2>
+    <div class="sub">Fill in the details, attach an audio file, then upload.</div>
+
+    <form id="uploadForm">
+      <div class="form-grid">
+        <div class="field">
+          <label>Sound name</label>
+          <input type="text" id="fName" placeholder="e.g. Deep Whoosh Transition" required>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <input type="text" id="fCategory" placeholder="e.g. Transitions" required>
+        </div>
+        <div class="field full">
+          <label>Description</label>
+          <textarea id="fDesc" placeholder="What does this sound like?" required></textarea>
+        </div>
+        <div class="field">
+          <label>Use for</label>
+          <input type="text" id="fUseFor" placeholder="e.g. Scene transitions, intros">
+        </div>
+        <div class="field">
+          <label>Price (0 for free)</label>
+          <input type="number" id="fPrice" min="0" step="0.01" value="0" required>
+        </div>
+        <div class="field full">
+          <label>Audio file</label>
+          <input type="file" id="fFile" accept="audio/*" required>
+        </div>
+      </div>
+
+      <div class="progress" id="uploadProgress"><i id="uploadProgressBar"></i></div>
+
+      <button type="submit" class="btn primary" style="margin-top:18px" id="uploadBtn">Upload sound</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Library</h2>
+    <div class="sub"><span id="libCount">0</span> sounds uploaded</div>
+    <div id="libList"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="cloud-config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
