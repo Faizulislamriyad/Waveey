@@ -24,7 +24,9 @@ const gateSignedOut = document.getElementById('gateSignedOut');
 const gateDenied = document.getElementById('gateDenied');
 const dashboard = document.getElementById('dashboard');
 
-document.getElementById('gateSignInBtn').onclick = () => auth.signInWithPopup(googleProvider).catch(e => toast(e.message));
+document.getElementById('gateSignInBtn').onclick = () => {
+  auth.signInWithRedirect(googleProvider).catch(e => toast(e.message));
+};
 document.getElementById('denySignOutBtn').onclick = () => auth.signOut();
 
 function showOnly(el){
@@ -35,6 +37,15 @@ function showOnly(el){
 let currentUser = null;
 let isAdmin = false;
 
+// ---------- Handle redirect result (popup-free sign-in) ----------
+auth.getRedirectResult().catch(err => {
+  // ignore "no redirect" cases silently
+  if (err && err.code && err.code !== 'auth/no-auth-event') {
+    toast('Sign-in failed: ' + err.message);
+  }
+});
+
+// ---------- Auth state ----------
 auth.onAuthStateChanged(async user => {
   currentUser = user;
   renderAuthArea();
@@ -46,9 +57,18 @@ auth.onAuthStateChanged(async user => {
   }
 
   try{
-    const doc = await db.collection('admins').doc(user.email).get();
+    // Force-refresh the ID token so Firestore rules see fresh auth info
+    await user.getIdToken(true);
+
+    const email = (user.email || '').toLowerCase();
+    console.log('Admin check: reading admins/' + email);
+
+    const doc = await db.collection('admins').doc(email).get();
     isAdmin = doc.exists;
+
+    console.log('Admin check result:', email, '→', isAdmin, doc.exists ? doc.data() : '(no doc)');
   }catch(e){
+    console.error('Admin check failed:', e.code, e.message);
     isAdmin = false;
   }
 
@@ -168,6 +188,8 @@ function loadLibrary(){
       row.querySelector('button').onclick = () => deleteSfx(doc.id);
       list.appendChild(row);
     });
+  }, err => {
+    console.error('Library load failed:', err.code, err.message);
   });
 }
 
