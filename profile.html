@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile — Waveey</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="ambient"><span></span><span></span></div>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="mark"><i></i><i></i><i></i><i></i></span>
+    Waveey
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
+    <a class="btn ghost small" href="index.html">← Back to site</a>
+    <div id="authArea"></div>
+  </div>
+</nav>
+
+<!-- Not signed in -->
+<div class="gate" id="gateSignedOut">
+  <h2>Your profile</h2>
+  <p>Sign in with Google to see your saved sounds and submit upload requests.</p>
+  <button class="btn primary" id="gateSignInBtn">Continue with Google</button>
+</div>
+
+<!-- Signed in -->
+<div class="admin-wrap hidden" id="profileWrap">
+
+  <div class="panel" style="display:flex;align-items:center;gap:16px">
+    <img id="pAvatar" src="" alt="" style="width:56px;height:56px;border-radius:50%">
+    <div>
+      <h2 id="pName" style="margin-bottom:4px"></h2>
+      <div class="sub" id="pEmail" style="margin-bottom:0"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Saved sounds</h2>
+    <div class="sub"><span id="savedCount">0</span> saved</div>
+    <div id="savedList"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Request a sound upload</h2>
+    <div class="sub">Attach the audio file and fill in the details — an admin will review it before it goes live.</div>
+
+    <form id="requestForm">
+      <div class="form-grid">
+        <div class="field">
+          <label>Sound name</label>
+          <input type="text" id="rqName" placeholder="e.g. Retro Camera Shutter" required>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <input type="text" id="rqCategory" list="categoryList" placeholder="e.g. Foley" required>
+          <datalist id="categoryList"></datalist>
+        </div>
+        <div class="field full">
+          <label>Description</label>
+          <textarea id="rqDesc" placeholder="What does this sound like?" required></textarea>
+        </div>
+        <div class="field">
+          <label>Use for</label>
+          <input type="text" id="rqUseFor" placeholder="e.g. UI clicks, transitions">
+        </div>
+        <div class="field">
+          <label>Price (0 for free)</label>
+          <input type="number" id="rqPrice" min="0" step="0.01" value="0" required>
+        </div>
+        <div class="field full">
+          <label>Audio file</label>
+          <input type="file" id="rqFile" accept="audio/*" required>
+        </div>
+      </div>
+
+      <div class="progress" id="rqProgress"><i id="rqProgressBar"></i></div>
+
+      <button type="submit" class="btn primary" style="margin-top:18px" id="rqSubmitBtn">Submit request</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Your orders</h2>
+    <div class="sub">Checkout requests for paid sounds and their approval status.</div>
+    <div id="myOrders"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Your requests</h2>
+    <div id="myRequests"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="cloud-config.js"></script>
+<script src="profile.js"></script>
+</body>
+</html>

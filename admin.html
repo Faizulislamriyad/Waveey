@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — Waveform</title>
+<title>Admin — Waveey</title>
+<link rel="icon" type="image/png" href="icon.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,7 +14,7 @@
 <nav class="nav">
   <div class="brand">
     <span class="mark"><i></i><i></i><i></i><i></i></span>
-    Waveform <span style="color:var(--text-faint);font-weight:500;font-size:.9rem;margin-left:6px">Admin</span>
+    Waveey <span style="color:var(--text-faint);font-weight:500;font-size:.9rem;margin-left:6px">Admin</span>
   </div>
   <div class="nav-actions">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
@@ -32,7 +33,7 @@
 <!-- Signed in, not an admin -->
 <div class="gate hidden" id="gateDenied">
   <h2>Not authorized</h2>
-  <p>This account doesn't have admin access. Ask an existing admin to add your email to the <b>admins</b> collection in Firestore.</p>
+  <p>This account doesn't have admin access. Ask an existing admin to add your email to <b>admin-config.js</b> (and the matching Firestore rule).</p>
   <button class="btn ghost" id="denySignOutBtn">Sign out</button>
 </div>
 
@@ -51,7 +52,8 @@
         </div>
         <div class="field">
           <label>Category</label>
-          <input type="text" id="fCategory" placeholder="e.g. Transitions" required>
+          <input type="text" id="fCategory" list="categoryList" placeholder="e.g. Transitions" required>
+          <datalist id="categoryList"></datalist>
         </div>
         <div class="field full">
           <label>Description</label>
@@ -75,6 +77,18 @@
 
       <button type="submit" class="btn primary" style="margin-top:18px" id="uploadBtn">Upload sound</button>
     </form>
+  </div>
+
+  <div class="panel">
+    <h2>Orders</h2>
+    <div class="sub"><span id="orderCount">0</span> pending checkout — approve to unlock the sounds for that buyer.</div>
+    <div id="ordersList"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Upload requests</h2>
+    <div class="sub"><span id="reqCount">0</span> pending — you can edit the name, description and category before approving. The sound file and price stay as the user submitted them.</div>
+    <div id="requestsList"></div>
   </div>
 
   <div class="panel">
