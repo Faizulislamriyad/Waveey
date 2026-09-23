@@ -22,13 +22,14 @@ function toast(msg){
 const authArea = document.getElementById('authArea');
 const gateSignedOut = document.getElementById('gateSignedOut');
 const gateDenied = document.getElementById('gateDenied');
+const gateChecking = document.getElementById('gateChecking');
 const dashboard = document.getElementById('dashboard');
 
 document.getElementById('gateSignInBtn').onclick = () => auth.signInWithPopup(googleProvider).catch(e => toast(e.message));
 document.getElementById('denySignOutBtn').onclick = () => auth.signOut();
 
 function showOnly(el){
-  [gateSignedOut, gateDenied, dashboard].forEach(x => x.classList.add('hidden'));
+  [gateSignedOut, gateDenied, gateChecking, dashboard].forEach(x => x.classList.add('hidden'));
   el.classList.remove('hidden');
 }
 
@@ -295,11 +296,19 @@ function loadOrders(){
       row.className = 'panel';
       row.style.cssText = 'padding:16px;margin-bottom:14px;background:var(--glass-strong)';
       const itemsHtml = (d.items || []).map(i => `${escapeHtml(i.name)} — $${i.price}`).join('<br>');
+      const p = d.payment || {};
       row.innerHTML = `
         <div class="sub" style="margin-bottom:6px">Requested by ${escapeHtml(d.userName || d.userEmail || '—')} (${escapeHtml(d.userEmail || '—')})</div>
         <div class="order-items">${itemsHtml}</div>
         <div style="font-weight:700;margin:8px 0">Total: $${(d.total || 0).toFixed(2)}</div>
-        <div style="display:flex;gap:10px">
+        <div class="order-payment">
+          <div><b>Name:</b> ${escapeHtml(p.fullName || '—')}</div>
+          <div><b>Phone:</b> ${escapeHtml(p.phone || '—')}</div>
+          <div><b>Email:</b> ${escapeHtml(p.email || '—')}</div>
+          <div><b>Method:</b> ${escapeHtml(p.method || '—')}</div>
+          <div><b>Transaction ID:</b> ${escapeHtml(p.transactionId || '—')}</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:10px">
           <button class="btn primary small approveBtn">Approve</button>
           <button class="btn danger small rejectBtn">Reject</button>
         </div>

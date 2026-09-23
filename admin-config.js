@@ -7,3 +7,7 @@
 const ADMIN_EMAILS = [
   "mdriyadboss1234@gmail.com"
 ];
+
+function isAdminEmail(email){
+  return ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes((email || '').toLowerCase().trim());
+}

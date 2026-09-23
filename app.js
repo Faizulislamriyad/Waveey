@@ -25,6 +25,8 @@ const authArea = document.getElementById('authArea');
 let currentUser = null;
 let savedIds = [];
 let purchasedIds = [];
+let savedPayment = null;
+let isAdmin = false;
 
 function renderAuthArea(){
   authArea.innerHTML = '';
@@ -53,24 +55,43 @@ function signIn(){
 }
 
 let userDocUnsub = null;
+let orderCountUnsub = null;
 auth.onAuthStateChanged(async user => {
   currentUser = user;
+  isAdmin = user ? isAdminEmail(user.email) : false;
   renderAuthArea();
+  toggleAdminOnlyNav();
   if (userDocUnsub) { userDocUnsub(); userDocUnsub = null; }
+  if (orderCountUnsub) { orderCountUnsub(); orderCountUnsub = null; }
 
   if (user){
     await ensureUserDoc(user);
     userDocUnsub = db.collection('users').doc(user.uid).onSnapshot(doc => {
-      savedIds = (doc.exists && doc.data().savedIds) || [];
-      purchasedIds = (doc.exists && doc.data().purchasedIds) || [];
+      const data = doc.exists ? doc.data() : {};
+      savedIds = data.savedIds || [];
+      purchasedIds = data.purchasedIds || [];
+      savedPayment = data.savedPayment || null;
       render();
     });
+    if (isAdmin){
+      orderCountUnsub = db.collection('orders').where('status', '==', 'pending').onSnapshot(snap => {
+        const badge = document.getElementById('adminOrderBadge');
+        badge.textContent = snap.size;
+        badge.classList.toggle('hidden', snap.size === 0);
+      });
+    }
   } else {
     savedIds = [];
     purchasedIds = [];
+    savedPayment = null;
     render();
   }
 });
+
+function toggleAdminOnlyNav(){
+  document.getElementById('cartBtn').classList.toggle('hidden', isAdmin);
+  if (!isAdmin) document.getElementById('adminOrderBadge').classList.add('hidden');
+}
 
 async function ensureUserDoc(user){
   const ref = db.collection('users').doc(user.uid);
@@ -180,20 +201,47 @@ document.getElementById('cartBtn').onclick = () => {
   document.getElementById('cartOverlay').classList.remove('hidden');
 };
 document.getElementById('cartCloseBtn').onclick = () => document.getElementById('cartOverlay').classList.add('hidden');
-document.getElementById('checkoutBtn').onclick = checkoutCart;
+document.getElementById('checkoutBtn').onclick = openPaymentForm;
 renderCartBadge();
 
-async function checkoutCart(){
-  const items = getCart();
-  if (!items.length){ toast('Your cart is empty'); return; }
+// ---------- Payment details form ----------
+const paymentOverlay = document.getElementById('paymentOverlay');
+const paymentForm = document.getElementById('paymentForm');
+
+function openPaymentForm(){
+  if (!getCart().length){ toast('Your cart is empty'); return; }
   if (!currentUser){
     document.getElementById('cartOverlay').classList.add('hidden');
     loginOverlay.classList.remove('hidden');
     return;
   }
-  const btn = document.getElementById('checkoutBtn');
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
+  document.getElementById('payName').value = savedPayment?.fullName || currentUser.displayName || '';
+  document.getElementById('payPhone').value = savedPayment?.phone || '';
+  document.getElementById('payEmail').value = savedPayment?.email || currentUser.email || '';
+  document.getElementById('payMethod').value = savedPayment?.method || 'Bkash';
+  document.getElementById('payTxnId').value = '';
+  document.getElementById('paySaveInfo').checked = !!savedPayment;
+  document.getElementById('cartOverlay').classList.add('hidden');
+  paymentOverlay.classList.remove('hidden');
+}
+document.getElementById('paymentCancelBtn').onclick = () => paymentOverlay.classList.add('hidden');
+
+paymentForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const items = getCart();
+  if (!items.length){ toast('Your cart is empty'); paymentOverlay.classList.add('hidden'); return; }
+
+  const fullName = document.getElementById('payName').value.trim();
+  const phone = document.getElementById('payPhone').value.trim();
+  const email = document.getElementById('payEmail').value.trim();
+  const method = document.getElementById('payMethod').value;
+  const transactionId = document.getElementById('payTxnId').value.trim();
+  const saveInfo = document.getElementById('paySaveInfo').checked;
+
+  const submitBtn = paymentForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Sending…';
+
   try{
     await db.collection('orders').add({
       userId: currentUser.uid,
@@ -202,18 +250,26 @@ async function checkoutCart(){
       items,
       total: items.reduce((sum, i) => sum + (Number(i.price) || 0), 0),
       status: 'pending',
+      payment: { fullName, phone, email, method, transactionId },
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+
+    if (saveInfo){
+      await db.collection('users').doc(currentUser.uid).update({
+        savedPayment: { fullName, phone, email, method }
+      });
+    }
+
     setCart([]);
-    document.getElementById('cartOverlay').classList.add('hidden');
+    paymentOverlay.classList.add('hidden');
     toast('Checkout request sent — an admin will review it.');
-  }catch(e){
-    toast('Checkout failed: ' + e.message);
+  }catch(err){
+    toast('Checkout failed: ' + err.message);
   }finally{
-    btn.disabled = false;
-    btn.textContent = 'Checkout';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit for approval';
   }
-}
+});
 
 // ---------- Data ----------
 let allSfx = [];
@@ -229,12 +285,20 @@ function colorFor(cat){
 
 db.collection('sfx').orderBy('uploadedAt', 'desc').onSnapshot(snap => {
   allSfx = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  markPopular(allSfx);
   document.getElementById('statSounds').textContent = allSfx.length;
   buildCategoryChips();
   render();
 }, err => {
   document.getElementById('sfxGrid').innerHTML = `<div class="empty"><b>Couldn't load the library</b>${err.message}</div>`;
 });
+
+function markPopular(list){
+  const withDownloads = list.filter(s => Number(s.downloads) > 0);
+  const top = [...withDownloads].sort((a,b) => (b.downloads||0) - (a.downloads||0)).slice(0, 3);
+  const topIds = new Set(top.map(s => s.id));
+  list.forEach(s => { s.popular = topIds.has(s.id); });
+}
 
 function buildCategoryChips(){
   const cats = [...new Set(allSfx.map(s => s.category).filter(Boolean))];
@@ -288,11 +352,12 @@ function renderCard(sfx){
   card.style.setProperty('--cat-color', colorFor(sfx.category || 'sfx'));
   const isSaved = savedIds.includes(sfx.id);
   const price = Number(sfx.price) || 0;
-  const owned = purchasedIds.includes(sfx.id);
+  const owned = isAdmin || purchasedIds.includes(sfx.id);
+  const downloads = Number(sfx.downloads) || 0;
 
   const priceLabel = price === 0
     ? '<span class="price free">Free</span>'
-    : owned
+    : (owned && !isAdmin)
       ? '<span class="price free">Purchased</span>'
       : `<span class="price">$${sfx.price}</span>`;
 
@@ -308,6 +373,7 @@ function renderCard(sfx){
           <svg viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
         </button>
         <span class="tag">${escapeHtml(sfx.category || 'General')}</span>
+        ${sfx.popular ? '<span class="tag popular-tag">🔥 Popular</span>' : ''}
       </div>
     </div>
     <p class="desc">${escapeHtml(sfx.description || 'No description provided.')}</p>
@@ -323,6 +389,10 @@ function renderCard(sfx){
     </div>
 
     <div class="meta-row"><b>Use for:</b> ${escapeHtml(sfx.useFor || '—')}</div>
+    <div class="download-count">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      ${downloads} download${downloads === 1 ? '' : 's'}
+    </div>
     <div class="card-foot">
       ${priceLabel}
       <button class="btn small">${btnLabel}</button>
@@ -395,7 +465,7 @@ function wirePlayer(card){
 
 async function handleDownload(sfx, btn){
   const price = Number(sfx.price) || 0;
-  const owned = purchasedIds.includes(sfx.id);
+  const owned = isAdmin || purchasedIds.includes(sfx.id);
 
   if (price > 0 && !owned){
     if (!currentUser){ loginOverlay.classList.remove('hidden'); return; }
@@ -424,12 +494,21 @@ async function handleDownload(sfx, btn){
     URL.revokeObjectURL(url);
     toast('Download started');
     bumpDownloadStat();
+    bumpSfxDownloadCount(sfx.id);
   }catch(err){
     toast('Download failed — try again');
   }finally{
     btn.textContent = original;
     btn.disabled = false;
   }
+}
+
+async function bumpSfxDownloadCount(sfxId){
+  try{
+    await db.collection('sfx').doc(sfxId).update({
+      downloads: firebase.firestore.FieldValue.increment(1)
+    });
+  }catch(e){ /* non-critical */ }
 }
 
 function guessExt(url){

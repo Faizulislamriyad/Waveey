@@ -21,6 +21,7 @@ function toast(msg){
 // ---------- Elements ----------
 const authArea = document.getElementById('authArea');
 const gateSignedOut = document.getElementById('gateSignedOut');
+const gateChecking = document.getElementById('gateChecking');
 const profileWrap = document.getElementById('profileWrap');
 document.getElementById('gateSignInBtn').onclick = () => auth.signInWithPopup(googleProvider).catch(e => toast(e.message));
 
@@ -30,6 +31,7 @@ let allSfxCache = [];
 auth.onAuthStateChanged(user => {
   currentUser = user;
   renderAuthArea();
+  gateChecking.classList.add('hidden');
 
   if (!user){
     gateSignedOut.classList.remove('hidden');
@@ -43,9 +45,14 @@ auth.onAuthStateChanged(user => {
   document.getElementById('pName').textContent = user.displayName || 'Anonymous';
   document.getElementById('pEmail').textContent = user.email || '';
 
-  watchSavedSounds(user.uid);
-  watchMyRequests(user.email);
-  watchMyOrders(user.uid);
+  const admin = isAdminEmail(user.email);
+  document.querySelectorAll('.user-only').forEach(el => el.classList.toggle('hidden', admin));
+
+  if (!admin){
+    watchSavedSounds(user.uid);
+    watchMyRequests(user.email);
+    watchMyOrders(user.uid);
+  }
 });
 
 function renderAuthArea(){

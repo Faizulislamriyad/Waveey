@@ -18,10 +18,15 @@
   </div>
   <div class="nav-actions">
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
-    <a class="btn ghost small" href="profile.html">Profile</a>
-    <a class="btn ghost small" href="admin.html">Admin</a>
-    <button class="btn ghost small cart-btn" id="cartBtn" aria-label="Cart">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    <a class="icon-btn" href="profile.html" id="profileLink" aria-label="Profile" title="Profile">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </a>
+    <a class="icon-btn" href="admin.html" id="adminLink" aria-label="Admin panel" title="Admin panel">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3.5v5c0 5-3.4 8.8-8 10.5-4.6-1.7-8-5.5-8-10.5v-5L12 2z"/></svg>
+      <span class="cart-badge hidden" id="adminOrderBadge">0</span>
+    </a>
+    <button class="icon-btn cart-btn" id="cartBtn" aria-label="Cart" title="Cart">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       <span class="cart-badge hidden" id="cartBadge">0</span>
     </button>
     <div id="authArea"></div>
@@ -82,12 +87,54 @@
   </div>
 </div>
 
+<!-- Payment details modal -->
+<div class="overlay hidden" id="paymentOverlay">
+  <div class="modal cart-modal">
+    <h3>Payment details</h3>
+    <form id="paymentForm">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Full name</label>
+          <input type="text" id="payName" required>
+        </div>
+        <div class="field">
+          <label>Phone number</label>
+          <input type="tel" id="payPhone" required>
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="payEmail" required>
+        </div>
+        <div class="field full">
+          <label>Payment method</label>
+          <select id="payMethod" required>
+            <option value="Bkash">Bkash</option>
+            <option value="Nogod">Nogod</option>
+            <option value="Roket">Roket</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Transaction ID</label>
+          <input type="text" id="payTxnId" required>
+        </div>
+      </div>
+      <label class="save-payment-check">
+        <input type="checkbox" id="paySaveInfo">
+        Save for next payment (everything except transaction ID)
+      </label>
+      <button type="submit" class="btn primary" style="width:100%;justify-content:center;margin-top:16px">Submit for approval</button>
+      <button type="button" class="btn ghost" id="paymentCancelBtn" style="width:100%;justify-content:center;margin-top:10px">Cancel</button>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="admin-config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
