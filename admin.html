@@ -12,13 +12,22 @@
 <div class="ambient"><span></span><span></span></div>
 
 <nav class="nav">
-  <div class="brand">
+  <a class="brand" href="index.html">
     <span class="mark"><i></i><i></i><i></i><i></i></span>
-    Waveey <span style="color:var(--text-faint);font-weight:500;font-size:.9rem;margin-left:6px">Admin</span>
-  </div>
+    Waveey
+  </a>
   <div class="nav-actions">
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
-    <a class="btn ghost small" href="index.html">← Back to site</a>
+    <a class="icon-btn" href="profile.html" id="profileLink" aria-label="Profile" title="Profile">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </a>
+    <a class="icon-btn hidden" href="admin.html" id="adminLink" aria-label="Admin panel" title="Admin panel">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3.5v5c0 5-3.4 8.8-8 10.5-4.6-1.7-8-5.5-8-10.5v-5L12 2z"/></svg>
+      <span class="cart-badge hidden" id="adminBadge">0</span>
+    </a>
+    <a class="icon-btn cart-btn" href="index.html#cart" id="cartBtn" aria-label="Cart" title="Cart">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      <span class="cart-badge hidden" id="cartBadge">0</span>
+    </a>
     <div id="authArea"></div>
   </div>
 </nav>
@@ -47,38 +56,95 @@
 
   <div class="panel">
     <h2>Upload a new sound</h2>
-    <div class="sub">Fill in the details, attach an audio file, then upload.</div>
+    <div class="sub">Fill in the details, attach the audio, then upload.</div>
+
+    <div class="type-toggle" id="uploadTypeToggle">
+      <button type="button" class="active" data-type="single">Single</button>
+      <button type="button" data-type="album">Album</button>
+    </div>
 
     <form id="uploadForm">
-      <div class="form-grid">
-        <div class="field">
-          <label>Sound name</label>
-          <input type="text" id="fName" placeholder="e.g. Deep Whoosh Transition" required>
-        </div>
-        <div class="field">
-          <label>Category</label>
-          <input type="text" id="fCategory" list="categoryList" placeholder="e.g. Transitions" required>
-          <datalist id="categoryList"></datalist>
-        </div>
-        <div class="field full">
-          <label>Description</label>
-          <textarea id="fDesc" placeholder="What does this sound like?" required></textarea>
-        </div>
-        <div class="field">
-          <label>Use for</label>
-          <input type="text" id="fUseFor" placeholder="e.g. Scene transitions, intros">
-        </div>
-        <div class="field">
-          <label>Price (0 for free)</label>
-          <input type="number" id="fPrice" min="0" step="0.01" value="0" required>
-        </div>
-        <div class="field full">
-          <label>Audio file</label>
-          <input type="file" id="fFile" accept="audio/*" required>
+      <div id="uploadSingleFields">
+        <div class="form-grid">
+          <div class="field">
+            <label>Sound name</label>
+            <input type="text" id="fName" placeholder="e.g. Deep Whoosh Transition">
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input type="text" id="fCategory" list="categoryList" placeholder="e.g. Transitions">
+            <datalist id="categoryList"></datalist>
+          </div>
+          <div class="field full">
+            <label>Description</label>
+            <textarea id="fDesc" placeholder="What does this sound like?"></textarea>
+          </div>
+          <div class="field">
+            <label>Use for</label>
+            <input type="text" id="fUseFor" placeholder="e.g. Scene transitions, intros">
+          </div>
+          <div class="field">
+            <label>Price (0 for free, Tk)</label>
+            <input type="number" id="fPrice" min="0" step="0.01" value="0">
+          </div>
+          <div class="field full">
+            <label>Audio file</label>
+            <input type="file" id="fFile" accept="audio/*">
+          </div>
         </div>
       </div>
 
+      <div id="uploadAlbumFields" class="hidden">
+        <div class="form-grid">
+          <div class="field">
+            <label>Album name</label>
+            <input type="text" id="fAlbumName" placeholder="e.g. Ambient Rain Pack">
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input type="text" id="fAlbumCategory" list="categoryList" placeholder="e.g. Ambience">
+          </div>
+          <div class="field full">
+            <label>Description</label>
+            <textarea id="fAlbumDesc" placeholder="What's in this album?"></textarea>
+          </div>
+          <div class="field">
+            <label>Cover image</label>
+            <input type="file" id="fAlbumCover" accept="image/*">
+          </div>
+          <div class="field">
+            <label>Preview music (public sample, free to listen)</label>
+            <input type="file" id="fAlbumPreview" accept="audio/*">
+          </div>
+          <div class="field full">
+            <label>Album tracks (all songs in the album)</label>
+            <input type="file" id="fAlbumTracks" accept="audio/*" multiple>
+          </div>
+          <div class="field">
+            <label>Price (0 for free, Tk)</label>
+            <input type="number" id="fAlbumPrice" min="0" step="0.01" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid" style="margin-top:16px">
+        <div class="field">
+          <label>Copyright</label>
+          <select id="fCopyright">
+            <option value="None">None</option>
+            <option value="Probably">Probably</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field full" style="margin-top:10px">
+        <label>Payment methods to receive money for this sound</label>
+        <div class="payment-rows" id="fPaymentRows"></div>
+        <button type="button" class="btn ghost small" id="fAddPayment">+ Add payment method</button>
+      </div>
+
       <div class="progress" id="uploadProgress"><i id="uploadProgressBar"></i></div>
+      <div class="sub" id="uploadStatusText" style="margin:8px 0 0"></div>
 
       <button type="submit" class="btn primary" style="margin-top:18px" id="uploadBtn">Upload sound</button>
     </form>
@@ -104,6 +170,51 @@
 
 </div>
 
+<!-- Edit sound modal -->
+<div class="overlay hidden" id="editOverlay">
+  <div class="modal edit-modal">
+    <h3>Edit sound</h3>
+    <form id="editForm">
+      <div class="form-grid">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="eName" required>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <input type="text" id="eCategory" list="categoryList" required>
+        </div>
+        <div class="field full">
+          <label>Description</label>
+          <textarea id="eDesc"></textarea>
+        </div>
+        <div class="field">
+          <label>Use for</label>
+          <input type="text" id="eUseFor">
+        </div>
+        <div class="field">
+          <label>Price (Tk)</label>
+          <input type="number" id="ePrice" min="0" step="0.01" required>
+        </div>
+        <div class="field">
+          <label>Copyright</label>
+          <select id="eCopyright">
+            <option value="None">None</option>
+            <option value="Probably">Probably</option>
+          </select>
+        </div>
+      </div>
+      <div class="field full" style="margin-top:10px">
+        <label>Payment methods</label>
+        <div class="payment-rows" id="ePaymentRows"></div>
+        <button type="button" class="btn ghost small" id="eAddPayment">+ Add payment method</button>
+      </div>
+      <button type="submit" class="btn primary" style="width:100%;justify-content:center;margin-top:16px">Save changes</button>
+      <button type="button" class="btn ghost" id="editCancelBtn" style="width:100%;justify-content:center;margin-top:10px">Cancel</button>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -112,6 +223,8 @@
 <script src="firebase-config.js"></script>
 <script src="cloud-config.js"></script>
 <script src="admin-config.js"></script>
+<script src="nav.js"></script>
+<script src="forms.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

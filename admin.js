@@ -1,13 +1,3 @@
-// ---------- Theme (shared behaviour with main site) ----------
-const themeToggle = document.getElementById('themeToggle');
-function applyTheme(mode){ document.body.classList.toggle('day', mode === 'day'); }
-applyTheme(localStorage.getItem('wf-theme') || 'night');
-themeToggle.addEventListener('click', () => {
-  const next = document.body.classList.contains('day') ? 'night' : 'day';
-  applyTheme(next);
-  localStorage.setItem('wf-theme', next);
-});
-
 // ---------- Toast ----------
 const toastEl = document.getElementById('toast');
 let toastTimer;
@@ -18,8 +8,13 @@ function toast(msg){
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
 }
 
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 // ---------- Elements ----------
-const authArea = document.getElementById('authArea');
 const gateSignedOut = document.getElementById('gateSignedOut');
 const gateDenied = document.getElementById('gateDenied');
 const gateChecking = document.getElementById('gateChecking');
@@ -38,7 +33,6 @@ let isAdmin = false;
 
 auth.onAuthStateChanged(async user => {
   currentUser = user;
-  renderAuthArea();
 
   if (!user){
     isAdmin = false;
@@ -46,15 +40,11 @@ auth.onAuthStateChanged(async user => {
     return;
   }
 
-  try{
-    isAdmin = ADMIN_EMAILS.map(e => e.toLowerCase().trim()).includes(user.email.toLowerCase().trim());
-  }catch(e){
-    isAdmin = false;
-    console.error('Admin check failed:', e);
-  }
+  isAdmin = isAdminEmail(user.email);
 
   if (isAdmin){
     showOnly(dashboard);
+    loadCategoryList();
     loadLibrary();
     loadRequests();
     loadOrders();
@@ -63,104 +53,119 @@ auth.onAuthStateChanged(async user => {
   }
 });
 
-function renderAuthArea(){
-  authArea.innerHTML = '';
-  if (!currentUser) return;
-  const chip = document.createElement('div');
-  chip.className = 'user-chip';
-  chip.innerHTML = `<img src="${currentUser.photoURL || ''}" alt=""><span>${(currentUser.displayName||'').split(' ')[0]}</span>`;
-  const logout = document.createElement('button');
-  logout.className = 'btn ghost small';
-  logout.textContent = 'Sign out';
-  logout.style.marginLeft = '8px';
-  logout.onclick = () => auth.signOut();
-  authArea.append(chip, logout);
+function loadCategoryList(){
+  db.collection('sfx').onSnapshot(snap => {
+    const cats = [...new Set(snap.docs.map(d => d.data().category).filter(Boolean))];
+    const dl = document.getElementById('categoryList');
+    dl.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+  });
 }
 
-// ---------- Category suggestions ----------
-function updateCategoryList(categories){
-  const datalist = document.getElementById('categoryList');
-  datalist.innerHTML = [...new Set(categories)].sort()
-    .map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
-}
+// ---------- Type toggle + payment rows for the upload form ----------
+initTypeToggle('uploadTypeToggle', 'uploadSingleFields', 'uploadAlbumFields');
+initPaymentRows('fPaymentRows', 'fAddPayment');
 
 // ---------- Upload ----------
 const form = document.getElementById('uploadForm');
 const progressWrap = document.getElementById('uploadProgress');
 const progressBar = document.getElementById('uploadProgressBar');
 const uploadBtn = document.getElementById('uploadBtn');
+const uploadStatusText = document.getElementById('uploadStatusText');
 
-form.addEventListener('submit', e => {
+form.addEventListener('submit', async e => {
   e.preventDefault();
-  const file = document.getElementById('fFile').files[0];
-  if (!file){ toast('Choose an audio file first'); return; }
-
-  const name = document.getElementById('fName').value.trim();
-  const category = document.getElementById('fCategory').value.trim();
-  const description = document.getElementById('fDesc').value.trim();
-  const useFor = document.getElementById('fUseFor').value.trim();
-  const price = Number(document.getElementById('fPrice').value) || 0;
-
   if (CLOUDINARY_CLOUD_NAME === 'YOUR_CLOUD_NAME'){
     toast('Set up Cloudinary first — see cloud-config.js / README');
     return;
   }
 
+  const type = getActiveType('uploadTypeToggle');
+  const copyright = document.getElementById('fCopyright').value;
+  const paymentMethods = collectPaymentRows('fPaymentRows');
+
   uploadBtn.disabled = true;
   progressWrap.classList.add('show');
   progressBar.style.width = '0%';
+  uploadStatusText.textContent = '';
 
-  uploadToCloudinary(file, pct => { progressBar.style.width = pct + '%'; })
-    .then(async result => {
+  try{
+    if (type === 'single'){
+      const file = document.getElementById('fFile').files[0];
+      if (!file){ toast('Choose an audio file first'); throw new Error('no-file'); }
+
+      const name = document.getElementById('fName').value.trim();
+      const category = document.getElementById('fCategory').value.trim();
+      const description = document.getElementById('fDesc').value.trim();
+      const useFor = document.getElementById('fUseFor').value.trim();
+      const price = Number(document.getElementById('fPrice').value) || 0;
+
+      uploadStatusText.textContent = 'Uploading audio…';
+      const result = await uploadToCloudinary(file, 'video', pct => { progressBar.style.width = pct + '%'; });
+
       await db.collection('sfx').add({
-        name, category, description, useFor, price,
+        type: 'single', name, category, description, useFor, price, copyright, paymentMethods,
         fileUrl: result.secure_url,
         cloudinaryId: result.public_id,
+        downloads: 0,
         uploadedBy: currentUser.email,
         uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      toast('Sound uploaded');
-      form.reset();
-    })
-    .catch(err => toast('Upload failed: ' + err.message))
-    .finally(() => {
-      uploadBtn.disabled = false;
-      progressWrap.classList.remove('show');
-      progressBar.style.width = '0%';
-    });
+    } else {
+      const cover = document.getElementById('fAlbumCover').files[0];
+      const preview = document.getElementById('fAlbumPreview').files[0];
+      const tracks = [...document.getElementById('fAlbumTracks').files];
+      if (!cover || !preview || !tracks.length){ toast('Cover, preview and at least one track are required'); throw new Error('no-file'); }
+
+      const name = document.getElementById('fAlbumName').value.trim();
+      const category = document.getElementById('fAlbumCategory').value.trim();
+      const description = document.getElementById('fAlbumDesc').value.trim();
+      const price = Number(document.getElementById('fAlbumPrice').value) || 0;
+
+      uploadStatusText.textContent = 'Uploading cover…';
+      const coverRes = await uploadToCloudinary(cover, 'image', pct => { progressBar.style.width = pct + '%'; });
+
+      uploadStatusText.textContent = 'Uploading preview…';
+      const previewRes = await uploadToCloudinary(preview, 'video', pct => { progressBar.style.width = pct + '%'; });
+
+      const trackUrls = [];
+      for (let i = 0; i < tracks.length; i++){
+        uploadStatusText.textContent = `Uploading track ${i+1} of ${tracks.length}…`;
+        const r = await uploadToCloudinary(tracks[i], 'video', pct => { progressBar.style.width = pct + '%'; });
+        trackUrls.push(r.secure_url);
+      }
+
+      await db.collection('sfx').add({
+        type: 'album', name, category, description, price, copyright, paymentMethods,
+        coverUrl: coverRes.secure_url,
+        previewUrl: previewRes.secure_url,
+        totalTracks: trackUrls.length,
+        trackUrls,
+        downloads: 0,
+        uploadedBy: currentUser.email,
+        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    toast('Sound uploaded');
+    form.reset();
+    initPaymentRows('fPaymentRows', 'fAddPayment');
+  }catch(err){
+    if (err.message !== 'no-file') toast('Upload failed: ' + err.message);
+  }finally{
+    uploadBtn.disabled = false;
+    progressWrap.classList.remove('show');
+    progressBar.style.width = '0%';
+    uploadStatusText.textContent = '';
+  }
 });
 
-function uploadToCloudinary(file, onProgress){
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`);
-
-    xhr.upload.onprogress = e => {
-      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
-    };
-    xhr.onload = () => {
-      try{
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-        else reject(new Error(data.error?.message || 'Upload failed'));
-      }catch(err){ reject(err); }
-    };
-    xhr.onerror = () => reject(new Error('Network error during upload'));
-    xhr.send(formData);
-  });
-}
-
-// ---------- Library list ----------
+// ---------- Library (with edit) ----------
+let libraryCache = {};
 function loadLibrary(){
   db.collection('sfx').orderBy('uploadedAt', 'desc').onSnapshot(snap => {
     const list = document.getElementById('libList');
     document.getElementById('libCount').textContent = snap.size;
-    updateCategoryList(snap.docs.map(d => d.data().category).filter(Boolean));
-
+    libraryCache = {};
     if (snap.empty){
       list.innerHTML = `<div class="admin-row"><div class="info"><b>No sounds yet</b><span>Upload your first one above.</span></div></div>`;
       return;
@@ -168,23 +173,28 @@ function loadLibrary(){
     list.innerHTML = '';
     snap.forEach(doc => {
       const d = doc.data();
+      libraryCache[doc.id] = d;
       const row = document.createElement('div');
       row.className = 'admin-row';
       row.innerHTML = `
         <div class="info">
-          <b>${escapeHtml(d.name || 'Untitled')}</b>
-          <span>${escapeHtml(d.category || 'General')} · ${d.price ? '$'+d.price : 'Free'} · by ${escapeHtml(d.uploadedBy || '—')}</span>
+          <b>${escapeHtml(d.name || 'Untitled')} ${d.type === 'album' ? '<span class="badge pending">Album</span>' : ''}</b>
+          <span>${escapeHtml(d.category || 'General')} · ${fmtPrice(d.price)} · ${d.downloads||0} downloads · by ${escapeHtml(d.uploadedBy || '—')}</span>
         </div>
-        <button class="btn small danger">Delete</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn ghost small editBtn">Edit</button>
+          <button class="btn small danger delBtn">Delete</button>
+        </div>
       `;
-      row.querySelector('button').onclick = () => deleteSfx(doc.id);
+      row.querySelector('.editBtn').onclick = () => openEditModal(doc.id, d);
+      row.querySelector('.delBtn').onclick = () => deleteSfx(doc.id);
       list.appendChild(row);
     });
   });
 }
 
 async function deleteSfx(id){
-  if (!confirm('Remove this sound from the library? This cannot be undone.\n\n(Note: the audio file itself stays on Cloudinary — delete it there too if you want it fully gone.)')) return;
+  if (!confirm('Remove this sound from the library? This cannot be undone.\n\n(Note: files stay on Cloudinary — delete them there too if you want them fully gone.)')) return;
   try{
     await db.collection('sfx').doc(id).delete();
     toast('Removed from library');
@@ -193,89 +203,48 @@ async function deleteSfx(id){
   }
 }
 
-// ---------- Upload requests ----------
-function loadRequests(){
-  db.collection('requests').where('status', '==', 'pending').onSnapshot(snap => {
-    const list = document.getElementById('requestsList');
-    document.getElementById('reqCount').textContent = snap.size;
+// ---------- Edit modal ----------
+const editOverlay = document.getElementById('editOverlay');
+const editForm = document.getElementById('editForm');
+let editingId = null;
+initPaymentRows('ePaymentRows', 'eAddPayment');
 
-    if (snap.empty){
-      list.innerHTML = `<div class="admin-row"><div class="info"><b>No pending requests</b><span>New upload requests from users will show up here.</span></div></div>`;
-      return;
-    }
-
-    list.innerHTML = '';
-    snap.forEach(doc => {
-      const d = doc.data();
-      const row = document.createElement('div');
-      row.className = 'panel';
-      row.style.cssText = 'padding:16px;margin-bottom:14px;background:var(--glass-strong)';
-      row.innerHTML = `
-        <div class="sub" style="margin-bottom:12px">Requested by ${escapeHtml(d.requestedByName || d.requestedBy || '—')} · ${d.price ? '$'+d.price : 'Free'} · <a href="${d.fileUrl}" target="_blank" rel="noopener">preview file</a></div>
-        <div class="form-grid">
-          <div class="field">
-            <label>Sound name</label>
-            <input type="text" class="rName" value="${escapeHtml(d.name || '')}">
-          </div>
-          <div class="field">
-            <label>Category</label>
-            <input type="text" class="rCategory" list="categoryList" value="${escapeHtml(d.category || '')}">
-          </div>
-          <div class="field full">
-            <label>Description</label>
-            <textarea class="rDesc">${escapeHtml(d.description || '')}</textarea>
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:14px">
-          <button class="btn primary small approveBtn">Approve</button>
-          <button class="btn danger small rejectBtn">Reject</button>
-        </div>
-      `;
-      row.querySelector('.approveBtn').onclick = () => approveRequest(doc.id, d, row);
-      row.querySelector('.rejectBtn').onclick = () => rejectRequest(doc.id);
-      list.appendChild(row);
-    });
-  });
+function openEditModal(id, d){
+  editingId = id;
+  document.getElementById('eName').value = d.name || '';
+  document.getElementById('eCategory').value = d.category || '';
+  document.getElementById('eDesc').value = d.description || '';
+  document.getElementById('eUseFor').value = d.useFor || '';
+  document.getElementById('ePrice').value = d.price || 0;
+  document.getElementById('eCopyright').value = d.copyright || 'None';
+  initPaymentRows('ePaymentRows', 'eAddPayment', d.paymentMethods);
+  editOverlay.classList.remove('hidden');
 }
+document.getElementById('editCancelBtn').onclick = () => editOverlay.classList.add('hidden');
 
-async function approveRequest(id, original, row){
-  const name = row.querySelector('.rName').value.trim();
-  const category = row.querySelector('.rCategory').value.trim();
-  const description = row.querySelector('.rDesc').value.trim();
-  if (!name || !category){ toast('Name and category are required'); return; }
-
+editForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!editingId) return;
+  const submitBtn = editForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
   try{
-    await db.collection('sfx').add({
-      name, category, description,
-      useFor: original.useFor || '',
-      price: original.price || 0,
-      fileUrl: original.fileUrl,
-      cloudinaryId: original.cloudinaryId || null,
-      uploadedBy: original.requestedBy || currentUser.email,
-      uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+    await db.collection('sfx').doc(editingId).update({
+      name: document.getElementById('eName').value.trim(),
+      category: document.getElementById('eCategory').value.trim(),
+      description: document.getElementById('eDesc').value.trim(),
+      useFor: document.getElementById('eUseFor').value.trim(),
+      price: Number(document.getElementById('ePrice').value) || 0,
+      copyright: document.getElementById('eCopyright').value,
+      paymentMethods: collectPaymentRows('ePaymentRows')
     });
-    await db.collection('requests').doc(id).update({ status: 'approved' });
-    toast('Approved — now live in the library');
-  }catch(e){
-    toast('Approve failed: ' + e.message);
+    toast('Sound updated');
+    editOverlay.classList.add('hidden');
+  }catch(err){
+    toast('Update failed: ' + err.message);
+  }finally{
+    submitBtn.disabled = false;
   }
-}
-
-async function rejectRequest(id){
-  if (!confirm('Reject this upload request?')) return;
-  try{
-    await db.collection('requests').doc(id).update({ status: 'rejected' });
-    toast('Request rejected');
-  }catch(e){
-    toast('Failed: ' + e.message);
-  }
-}
-
-function escapeHtml(str){
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+});
 
 // ---------- Orders (checkout requests) ----------
 function loadOrders(){
@@ -295,12 +264,12 @@ function loadOrders(){
       const row = document.createElement('div');
       row.className = 'panel';
       row.style.cssText = 'padding:16px;margin-bottom:14px;background:var(--glass-strong)';
-      const itemsHtml = (d.items || []).map(i => `${escapeHtml(i.name)} — $${i.price}`).join('<br>');
+      const itemsHtml = (d.items || []).map(i => `${escapeHtml(i.name)} — ${fmtPrice(i.price)}`).join('<br>');
       const p = d.payment || {};
       row.innerHTML = `
         <div class="sub" style="margin-bottom:6px">Requested by ${escapeHtml(d.userName || d.userEmail || '—')} (${escapeHtml(d.userEmail || '—')})</div>
         <div class="order-items">${itemsHtml}</div>
-        <div style="font-weight:700;margin:8px 0">Total: $${(d.total || 0).toFixed(2)}</div>
+        <div style="font-weight:700;margin:8px 0">Total: Tk ${(d.total || 0).toFixed(2)}</div>
         <div class="order-payment">
           <div><b>Name:</b> ${escapeHtml(p.fullName || '—')}</div>
           <div><b>Phone:</b> ${escapeHtml(p.phone || '—')}</div>
@@ -346,6 +315,117 @@ async function rejectOrder(id){
   try{
     await db.collection('orders').doc(id).update({ status: 'rejected' });
     toast('Order rejected');
+  }catch(e){
+    toast('Failed: ' + e.message);
+  }
+}
+
+// ---------- Upload requests ----------
+function loadRequests(){
+  db.collection('requests').where('status', '==', 'pending').onSnapshot(snap => {
+    const list = document.getElementById('requestsList');
+    document.getElementById('reqCount').textContent = snap.size;
+
+    if (snap.empty){
+      list.innerHTML = `<div class="admin-row"><div class="info"><b>No pending requests</b><span>User-submitted sounds will show up here.</span></div></div>`;
+      return;
+    }
+
+    const docs = snap.docs.sort((a,b) => (b.data().requestedAt?.seconds||0) - (a.data().requestedAt?.seconds||0));
+    list.innerHTML = '';
+    docs.forEach(doc => {
+      const d = doc.data();
+      const isAlbum = d.type === 'album';
+      const row = document.createElement('div');
+      row.className = 'panel';
+      row.style.cssText = 'padding:16px;margin-bottom:14px;background:var(--glass-strong)';
+
+      const rowId = `req-${doc.id}`;
+      const pmHtml = (d.paymentMethods||[]).map(p => `${p.method}: ${p.number}`).join(' · ') || '—';
+
+      row.innerHTML = `
+        <div class="sub" style="margin-bottom:10px">
+          Submitted by ${escapeHtml(d.requestedBy || '—')} ${isAlbum ? '<span class="badge pending">Album</span>' : ''} · ${fmtPrice(d.price)} · Copyright: ${escapeHtml(d.copyright || 'None')}
+        </div>
+
+        ${isAlbum ? `
+          <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+            ${d.coverUrl ? `<img src="${d.coverUrl}" alt="" style="width:80px;height:80px;border-radius:10px;object-fit:cover">` : ''}
+            <div style="flex:1;min-width:180px">
+              <div class="sub" style="margin-bottom:4px">Preview (public sample):</div>
+              <audio controls preload="none" src="${d.previewUrl||''}" style="width:100%;height:36px"></audio>
+              <div class="sub" style="margin:6px 0 0">${d.totalTracks||0} track(s) in this album</div>
+            </div>
+          </div>
+        ` : `
+          <audio controls preload="none" src="${d.fileUrl||''}" style="width:100%;height:36px;margin-bottom:10px"></audio>
+        `}
+
+        <div class="sub" style="margin-bottom:6px">Payment methods: ${escapeHtml(pmHtml)}</div>
+
+        <div class="request-edit-fields">
+          <div class="field"><label>Name</label><input type="text" id="${rowId}-name" value="${escapeHtml(d.name||'')}"></div>
+          <div class="field"><label>Category</label><input type="text" id="${rowId}-category" list="categoryList" value="${escapeHtml(d.category||'')}"></div>
+          <div class="field full"><label>Description</label><textarea id="${rowId}-desc">${escapeHtml(d.description||'')}</textarea></div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button class="btn primary small approveBtn">Approve &amp; publish</button>
+          <button class="btn danger small rejectBtn">Reject</button>
+        </div>
+      `;
+      row.querySelector('.approveBtn').onclick = () => approveRequest(doc.id, d, rowId, row);
+      row.querySelector('.rejectBtn').onclick = () => rejectRequest(doc.id);
+      list.appendChild(row);
+    });
+  });
+}
+
+async function approveRequest(id, d, rowId, row){
+  const btn = row.querySelector('.approveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Publishing…';
+  try{
+    const name = document.getElementById(`${rowId}-name`).value.trim();
+    const category = document.getElementById(`${rowId}-category`).value.trim();
+    const description = document.getElementById(`${rowId}-desc`).value.trim();
+
+    const published = {
+      type: d.type || 'single',
+      name, category, description,
+      price: d.price || 0,
+      copyright: d.copyright || 'None',
+      paymentMethods: d.paymentMethods || [],
+      downloads: 0,
+      uploadedBy: d.requestedBy || 'user request',
+      uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (published.type === 'album'){
+      published.coverUrl = d.coverUrl;
+      published.previewUrl = d.previewUrl;
+      published.totalTracks = d.totalTracks || 0;
+      published.trackUrls = d.trackUrls || [];
+    } else {
+      published.useFor = d.useFor || '';
+      published.fileUrl = d.fileUrl;
+      published.cloudinaryId = d.cloudinaryId || '';
+    }
+
+    await db.collection('sfx').add(published);
+    await db.collection('requests').doc(id).update({ status: 'approved' });
+    toast('Published to the library');
+  }catch(err){
+    toast('Publish failed: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Approve & publish';
+  }
+}
+
+async function rejectRequest(id){
+  if (!confirm('Reject this upload request?')) return;
+  try{
+    await db.collection('requests').doc(id).update({ status: 'rejected' });
+    toast('Request rejected');
   }catch(e){
     toast('Failed: ' + e.message);
   }

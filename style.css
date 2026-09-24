@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
-/* ---------- Tokens ---------- */
+/* ---------- Tokens (dark only) ---------- */
 :root{
   --bg: #090c14;
   --bg-2: #0d1120;
@@ -23,24 +23,6 @@
   color-scheme: dark;
 }
 
-body.day{
-  --bg: linear-gradient(160deg, #f6f4ff 0%, #eef8f6 55%, #f4f1fd 100%);
-  --bg-2: #e4e8f5;
-  --glow-a: #b39dff;
-  --glow-b: #5be0cf;
-  --glass: rgba(255,255,255,0.62);
-  --glass-strong: rgba(255,255,255,0.82);
-  --glass-border: rgba(35,25,80,0.11);
-  --text: #171a2b;
-  --text-dim: #4d5273;
-  --text-faint: #7b7fa0;
-  --accent: #6a44ff;
-  --accent-2: #0eb8a8;
-  --shadow-glow: 0 10px 32px -8px rgba(106,68,255,0.28);
-  --card-shadow: 0 6px 28px -12px rgba(40,30,90,0.14);
-  color-scheme: light;
-}
-
 *{ box-sizing: border-box; }
 html{ scroll-behavior: smooth; }
 
@@ -52,7 +34,6 @@ body{
   background: var(--bg);
   color: var(--text);
   font-family: 'Inter', sans-serif;
-  transition: background .5s ease, color .5s ease;
   position: relative;
   overflow-x: hidden;
 }
@@ -79,13 +60,11 @@ a{ color: inherit; }
   border-radius: 50%;
   filter: blur(90px);
   opacity: .38;
-  transition: opacity .5s ease, background .5s ease;
 }
 .ambient span:nth-child(1){ background: var(--glow-a); top: -14%; left: -8%; }
 .ambient span:nth-child(2){ background: var(--glow-b); bottom: -18%; right: -6%; }
-body.day .ambient span{ opacity: .3; }
 
-/* ---------- Nav ---------- */
+/* ---------- Nav (identical markup on every page) ---------- */
 .nav{
   display:flex;
   align-items:center;
@@ -106,6 +85,8 @@ body.day .ambient span{ opacity: .3; }
   font-family:'Sora', sans-serif;
   font-weight: 700;
   font-size: 1.18rem;
+  text-decoration: none;
+  color: var(--text);
 }
 .brand .mark{ display:flex; align-items:flex-end; gap:2px; height:20px; }
 .brand .mark i{
@@ -121,24 +102,7 @@ body.day .ambient span{ opacity: .3; }
 .brand .mark i:nth-child(4){ height:20px; animation-delay: -0.9s;}
 @keyframes bar{ 0%,100%{ transform: scaleY(.5);} 50%{ transform: scaleY(1);} }
 
-.nav-actions{ display:flex; align-items:center; gap:14px; }
-
-.theme-toggle{
-  width: 52px; height: 28px;
-  border-radius: 20px;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-strong);
-  position: relative;
-  cursor: pointer;
-  padding: 0;
-}
-.theme-toggle .dot{
-  position:absolute; top:3px; left:3px;
-  width: 20px; height:20px; border-radius:50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  transition: left .3s cubic-bezier(.6,.2,.2,1);
-}
-body.day .theme-toggle .dot{ left: 27px; }
+.nav-actions{ display:flex; align-items:center; gap:12px; }
 
 .btn{
   font-family:'Inter', sans-serif;
@@ -165,6 +129,7 @@ body.day .theme-toggle .dot{ left: 27px; }
 .btn.ghost{ background: transparent; }
 .btn.small{ padding: 7px 13px; font-size: .82rem; }
 .btn.danger{ color: var(--danger); border-color: rgba(255,107,122,.35); background: rgba(255,107,122,.08); }
+.btn:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
 
 .user-chip{
   display:flex; align-items:center; gap:8px;
@@ -178,7 +143,7 @@ body.day .theme-toggle .dot{ left: 27px; }
 .user-chip img{ width:26px; height:26px; border-radius:50%; }
 .user-chip span{ font-size:.85rem; font-weight:600; }
 
-/* ---------- Icon nav buttons (profile / admin / cart) ---------- */
+/* ---------- Icon nav buttons (profile / admin / cart / sign-out) ---------- */
 .icon-btn{
   position: relative;
   width: 38px; height: 38px;
@@ -193,7 +158,6 @@ body.day .theme-toggle .dot{ left: 27px; }
   transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 .icon-btn:hover{ transform: translateY(-1px); box-shadow: var(--shadow-glow); border-color: var(--accent); }
-.icon-btn.hidden{ display: none !important; }
 
 /* ---------- Spinner (checking access) ---------- */
 .spinner{
@@ -227,13 +191,29 @@ body.day .theme-toggle .dot{ left: 27px; }
 }
 .order-payment b{ color: var(--text-faint); font-weight:600; }
 
-/* ---------- Save payment checkbox ---------- */
-.save-payment-check{
-  display:flex; align-items:center; gap:8px;
+/* ---------- Save payment checkbox / terms checkbox ---------- */
+.check-row{
+  display:flex; align-items:flex-start; gap:8px;
   font-size: .84rem; color: var(--text-dim);
-  margin-top: 14px; cursor: pointer;
+  margin-top: 14px; cursor: pointer; text-align:left;
 }
-.save-payment-check input{ width: 16px; height: 16px; accent-color: var(--accent); }
+.check-row input{ width: 16px; height: 16px; accent-color: var(--accent); margin-top:2px; flex-shrink:0; }
+
+.terms-box{
+  background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  font-size: .78rem; color: var(--text-faint); line-height:1.6;
+  text-align:left; margin-top: 14px; max-height: 130px; overflow-y:auto;
+}
+
+/* ---------- Seller payment reference (checkout) ---------- */
+.seller-pay-list{
+  text-align:left; font-size:.82rem; color:var(--text-dim);
+  background: var(--glass); border:1px solid var(--glass-border);
+  border-radius: var(--radius-sm); padding: 10px 12px; margin: 12px 0;
+}
+.seller-pay-list b{ display:block; margin-bottom:2px; }
+.seller-pay-list .pm-line{ color: var(--text-faint); }
 
 /* ---------- Dashboard ---------- */
 .dashboard{
@@ -358,9 +338,6 @@ audio.raw-audio{ display:none; }
 .badge.approved{ background: rgba(23,214,196,.18); color: var(--accent-2); }
 .badge.rejected{ background: rgba(255,107,122,.18); color: var(--danger); }
 
-/* ---------- Category autocomplete (native datalist, minimal extra styling needed) ---------- */
-
-
 /* ---------- Filters ---------- */
 .toolbar{
   display:flex; flex-wrap:wrap; gap:12px;
@@ -433,9 +410,14 @@ audio.raw-audio{ display:none; }
 }
 .card:hover{ transform: translateY(-4px); border-color: var(--cat-color, var(--accent)); box-shadow: var(--shadow-glow); }
 
+.card-cover{
+  width:100%; aspect-ratio: 1/1; object-fit: cover;
+  border-radius: var(--radius-md); margin-bottom: -2px;
+}
+
 .card-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .card-top h3{ font-size: 1.08rem; font-weight:700; }
-.card-top .tag-row{ display:flex; align-items:center; gap:8px; }
+.card-top .tag-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
 .tag{
   font-size: .72rem;
   font-weight: 700;
@@ -445,6 +427,7 @@ audio.raw-audio{ display:none; }
   color: var(--cat-color, var(--accent));
   white-space:nowrap;
 }
+.tag.album-tag{ background: rgba(138,107,255,.2); color: var(--accent); }
 .card p.desc{
   color: var(--text-dim);
   font-size: .88rem;
@@ -480,6 +463,7 @@ audio.raw-audio{ display:none; }
   backdrop-filter: blur(6px);
   display:flex; align-items:center; justify-content:center;
   padding: 20px;
+  overflow-y:auto;
 }
 .overlay.hidden{ display:none; }
 .modal{
@@ -490,6 +474,7 @@ audio.raw-audio{ display:none; }
   padding: 28px;
   backdrop-filter: blur(24px) saturate(160%);
   text-align:center;
+  margin: auto;
 }
 .modal h3{ font-size:1.3rem; margin-bottom:10px; }
 .modal p{ color: var(--text-dim); font-size:.92rem; margin-bottom:22px; line-height:1.5; }
@@ -519,7 +504,7 @@ footer{
   font-size: .82rem;
 }
 
-/* ---------- Admin ---------- */
+/* ---------- Admin / profile shared layout ---------- */
 .admin-wrap{
   max-width: 1100px;
   margin: 0 auto;
@@ -586,6 +571,55 @@ footer{
 .gate h2{ font-size:1.6rem; }
 .gate p{ color:var(--text-dim); max-width: 40ch; }
 
+/* ---------- Single / Album type toggle ---------- */
+.type-toggle{
+  display:inline-flex; background: var(--glass-strong);
+  border: 1px solid var(--glass-border); border-radius: 999px;
+  padding: 4px; margin-bottom: 20px; gap:4px;
+}
+.type-toggle button{
+  border:none; background:transparent; color: var(--text-dim);
+  font-family:'Inter'; font-weight:600; font-size:.86rem;
+  padding: 8px 20px; border-radius: 999px; cursor:pointer;
+}
+.type-toggle button.active{
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color:#fff;
+}
+
+/* ---------- Payment method rows (upload/edit/request forms) ---------- */
+.payment-rows{ display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+.payment-row{ display:flex; gap:8px; align-items:center; }
+.payment-row select{
+  background: var(--glass-strong); border:1px solid var(--glass-border);
+  border-radius: var(--radius-sm); padding:9px 10px; color:var(--text);
+  font-family:'Inter'; font-size:16px; flex-shrink:0; width:110px;
+}
+.payment-row input{
+  flex:1; background: var(--glass-strong); border:1px solid var(--glass-border);
+  border-radius: var(--radius-sm); padding:9px 11px; color:var(--text);
+  font-family:'Inter'; font-size:16px;
+}
+.payment-row .pm-remove{
+  border:none; background:transparent; color: var(--danger);
+  font-size:1.1rem; cursor:pointer; flex-shrink:0; padding: 4px 6px;
+}
+
+/* ---------- Edit modal (admin library) ---------- */
+.edit-modal{ max-width: 640px; text-align:left; max-height: 88vh; overflow-y:auto; }
+.edit-modal h3{ text-align:left; }
+
+/* ---------- Sales dashboard (admin profile) ---------- */
+.sales-grid{
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr));
+  gap:14px; margin-bottom: 10px;
+}
+.sales-card{
+  background: var(--glass); border:1px solid var(--glass-border);
+  border-radius: var(--radius-md); padding:16px; text-align:center;
+}
+.sales-card b{ display:block; font-family:'Sora'; font-size:1.4rem; font-weight:800; color: var(--accent-2); }
+.sales-card span{ color: var(--text-faint); font-size:.78rem; }
+
 :focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media (max-width: 720px){
@@ -593,9 +627,6 @@ footer{
   .nav-actions{ flex-wrap: wrap; gap: 6px; row-gap: 8px; justify-content: flex-end; }
   .brand{ font-size: 1.02rem; }
 
-  .theme-toggle{ width: 44px; height: 24px; }
-  .theme-toggle .dot{ width: 16px; height: 16px; }
-  body.day .theme-toggle .dot{ left: 24px; }
   .icon-btn{ width: 34px; height: 34px; }
   .icon-btn svg{ width: 15px; height: 15px; }
   .cart-badge{ min-width: 15px; height: 15px; font-size: .6rem; }
@@ -619,6 +650,8 @@ footer{
   .admin-row button{ width: 100%; }
 
   .order-payment{ grid-template-columns: 1fr; gap: 6px; }
+  .payment-row{ flex-wrap: wrap; }
+  .payment-row select{ width: 100%; }
 
   .gate{ padding: 28px 20px; min-height: 60vh; }
   .gate button{ width: 100%; justify-content: center; }
@@ -630,6 +663,7 @@ footer{
   .btn{ padding: 9px 14px; font-size: .88rem; }
 
   .modal{ padding: 22px; }
+  .sales-grid{ grid-template-columns: repeat(2,1fr); }
 }
 
 @media (max-width: 400px){

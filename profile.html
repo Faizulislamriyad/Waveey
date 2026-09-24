@@ -12,13 +12,22 @@
 <div class="ambient"><span></span><span></span></div>
 
 <nav class="nav">
-  <div class="brand">
+  <a class="brand" href="index.html">
     <span class="mark"><i></i><i></i><i></i><i></i></span>
     Waveey
-  </div>
+  </a>
   <div class="nav-actions">
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle day and night mode"><span class="dot"></span></button>
-    <a class="btn ghost small" href="index.html">← Back to site</a>
+    <a class="icon-btn" href="profile.html" id="profileLink" aria-label="Profile" title="Profile">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </a>
+    <a class="icon-btn hidden" href="admin.html" id="adminLink" aria-label="Admin panel" title="Admin panel">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3.5v5c0 5-3.4 8.8-8 10.5-4.6-1.7-8-5.5-8-10.5v-5L12 2z"/></svg>
+      <span class="cart-badge hidden" id="adminBadge">0</span>
+    </a>
+    <a class="icon-btn cart-btn" href="index.html#cart" id="cartBtn" aria-label="Cart" title="Cart">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+      <span class="cart-badge hidden" id="cartBadge">0</span>
+    </a>
     <div id="authArea"></div>
   </div>
 </nav>
@@ -46,6 +55,24 @@
     </div>
   </div>
 
+  <!-- Admin-only: sales dashboard -->
+  <div class="panel admin-only hidden">
+    <h2>Sales dashboard</h2>
+    <div class="sub">Revenue from approved orders.</div>
+    <div class="sales-grid">
+      <div class="sales-card"><b id="salesTotal">Tk 0</b><span>Total sales</span></div>
+      <div class="sales-card"><b id="salesOrders">0</b><span>Approved orders</span></div>
+      <div class="sales-card"><b id="salesPending">0</b><span>Pending orders</span></div>
+    </div>
+  </div>
+
+  <!-- Admin-only: upload requests quick view -->
+  <div class="panel admin-only hidden">
+    <h2>Upload requests</h2>
+    <div class="sub"><span id="adminReqCount">0</span> pending — approve/reject here, or edit details in the full admin panel.</div>
+    <div id="adminReqList"></div>
+  </div>
+
   <div class="panel user-only">
     <h2>Saved sounds</h2>
     <div class="sub"><span id="savedCount">0</span> saved</div>
@@ -54,38 +81,95 @@
 
   <div class="panel user-only">
     <h2>Request a sound upload</h2>
-    <div class="sub">Attach the audio file and fill in the details — an admin will review it before it goes live.</div>
+    <div class="sub">Attach the audio and fill in the details — an admin will review it before it goes live.</div>
+
+    <div class="type-toggle" id="requestTypeToggle">
+      <button type="button" class="active" data-type="single">Single</button>
+      <button type="button" data-type="album">Album</button>
+    </div>
 
     <form id="requestForm">
-      <div class="form-grid">
-        <div class="field">
-          <label>Sound name</label>
-          <input type="text" id="rqName" placeholder="e.g. Retro Camera Shutter" required>
-        </div>
-        <div class="field">
-          <label>Category</label>
-          <input type="text" id="rqCategory" list="categoryList" placeholder="e.g. Foley" required>
-          <datalist id="categoryList"></datalist>
-        </div>
-        <div class="field full">
-          <label>Description</label>
-          <textarea id="rqDesc" placeholder="What does this sound like?" required></textarea>
-        </div>
-        <div class="field">
-          <label>Use for</label>
-          <input type="text" id="rqUseFor" placeholder="e.g. UI clicks, transitions">
-        </div>
-        <div class="field">
-          <label>Price (0 for free)</label>
-          <input type="number" id="rqPrice" min="0" step="0.01" value="0" required>
-        </div>
-        <div class="field full">
-          <label>Audio file</label>
-          <input type="file" id="rqFile" accept="audio/*" required>
+      <div id="requestSingleFields">
+        <div class="form-grid">
+          <div class="field">
+            <label>Sound name</label>
+            <input type="text" id="rqName" placeholder="e.g. Retro Camera Shutter">
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input type="text" id="rqCategory" list="categoryList" placeholder="e.g. Foley">
+            <datalist id="categoryList"></datalist>
+          </div>
+          <div class="field full">
+            <label>Description</label>
+            <textarea id="rqDesc" placeholder="What does this sound like?"></textarea>
+          </div>
+          <div class="field">
+            <label>Use for</label>
+            <input type="text" id="rqUseFor" placeholder="e.g. UI clicks, transitions">
+          </div>
+          <div class="field">
+            <label>Price (0 for free, Tk)</label>
+            <input type="number" id="rqPrice" min="0" step="0.01" value="0">
+          </div>
+          <div class="field full">
+            <label>Audio file</label>
+            <input type="file" id="rqFile" accept="audio/*">
+          </div>
         </div>
       </div>
 
+      <div id="requestAlbumFields" class="hidden">
+        <div class="form-grid">
+          <div class="field">
+            <label>Album name</label>
+            <input type="text" id="rqAlbumName" placeholder="e.g. Ambient Rain Pack">
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input type="text" id="rqAlbumCategory" list="categoryList" placeholder="e.g. Ambience">
+          </div>
+          <div class="field full">
+            <label>Description</label>
+            <textarea id="rqAlbumDesc" placeholder="What's in this album?"></textarea>
+          </div>
+          <div class="field">
+            <label>Cover image</label>
+            <input type="file" id="rqAlbumCover" accept="image/*">
+          </div>
+          <div class="field">
+            <label>Preview music (public sample)</label>
+            <input type="file" id="rqAlbumPreview" accept="audio/*">
+          </div>
+          <div class="field full">
+            <label>Album tracks (all songs)</label>
+            <input type="file" id="rqAlbumTracks" accept="audio/*" multiple>
+          </div>
+          <div class="field">
+            <label>Price (0 for free, Tk)</label>
+            <input type="number" id="rqAlbumPrice" min="0" step="0.01" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid" style="margin-top:16px">
+        <div class="field">
+          <label>Copyright</label>
+          <select id="rqCopyright">
+            <option value="None">None</option>
+            <option value="Probably">Probably</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field full" style="margin-top:10px">
+        <label>Payment methods to receive money for this sound</label>
+        <div class="payment-rows" id="rqPaymentRows"></div>
+        <button type="button" class="btn ghost small" id="rqAddPayment">+ Add payment method</button>
+      </div>
+
       <div class="progress" id="rqProgress"><i id="rqProgressBar"></i></div>
+      <div class="sub" id="rqStatusText" style="margin:8px 0 0"></div>
 
       <button type="submit" class="btn primary" style="margin-top:18px" id="rqSubmitBtn">Submit request</button>
     </form>
@@ -112,6 +196,8 @@
 <script src="firebase-config.js"></script>
 <script src="cloud-config.js"></script>
 <script src="admin-config.js"></script>
+<script src="nav.js"></script>
+<script src="forms.js"></script>
 <script src="profile.js"></script>
 </body>
 </html>

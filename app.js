@@ -1,15 +1,3 @@
-// ---------- Theme ----------
-const themeToggle = document.getElementById('themeToggle');
-function applyTheme(mode){
-  document.body.classList.toggle('day', mode === 'day');
-}
-applyTheme(localStorage.getItem('wf-theme') || 'night');
-themeToggle.addEventListener('click', () => {
-  const next = document.body.classList.contains('day') ? 'night' : 'day';
-  applyTheme(next);
-  localStorage.setItem('wf-theme', next);
-});
-
 // ---------- Toast ----------
 const toastEl = document.getElementById('toast');
 let toastTimer;
@@ -21,48 +9,17 @@ function toast(msg){
 }
 
 // ---------- Auth ----------
-const authArea = document.getElementById('authArea');
 let currentUser = null;
 let savedIds = [];
 let purchasedIds = [];
 let savedPayment = null;
 let isAdmin = false;
 
-function renderAuthArea(){
-  authArea.innerHTML = '';
-  if (currentUser){
-    const chip = document.createElement('a');
-    chip.href = 'profile.html';
-    chip.className = 'user-chip';
-    chip.innerHTML = `<img src="${currentUser.photoURL || ''}" alt=""><span>${(currentUser.displayName||'').split(' ')[0]}</span>`;
-    const logout = document.createElement('button');
-    logout.className = 'btn ghost small';
-    logout.textContent = 'Sign out';
-    logout.style.marginLeft = '8px';
-    logout.onclick = () => auth.signOut();
-    authArea.append(chip, logout);
-  } else {
-    const btn = document.createElement('button');
-    btn.className = 'btn primary small';
-    btn.textContent = 'Sign in';
-    btn.onclick = () => signIn();
-    authArea.append(btn);
-  }
-}
-
-function signIn(){
-  return auth.signInWithPopup(googleProvider).catch(err => toast('Sign-in failed: ' + err.message));
-}
-
 let userDocUnsub = null;
-let orderCountUnsub = null;
 auth.onAuthStateChanged(async user => {
   currentUser = user;
   isAdmin = user ? isAdminEmail(user.email) : false;
-  renderAuthArea();
-  toggleAdminOnlyNav();
   if (userDocUnsub) { userDocUnsub(); userDocUnsub = null; }
-  if (orderCountUnsub) { orderCountUnsub(); orderCountUnsub = null; }
 
   if (user){
     await ensureUserDoc(user);
@@ -73,13 +30,6 @@ auth.onAuthStateChanged(async user => {
       savedPayment = data.savedPayment || null;
       render();
     });
-    if (isAdmin){
-      orderCountUnsub = db.collection('orders').where('status', '==', 'pending').onSnapshot(snap => {
-        const badge = document.getElementById('adminOrderBadge');
-        badge.textContent = snap.size;
-        badge.classList.toggle('hidden', snap.size === 0);
-      });
-    }
   } else {
     savedIds = [];
     purchasedIds = [];
@@ -87,11 +37,6 @@ auth.onAuthStateChanged(async user => {
     render();
   }
 });
-
-function toggleAdminOnlyNav(){
-  document.getElementById('cartBtn').classList.toggle('hidden', isAdmin);
-  if (!isAdmin) document.getElementById('adminOrderBadge').classList.add('hidden');
-}
 
 async function ensureUserDoc(user){
   const ref = db.collection('users').doc(user.uid);
@@ -129,7 +74,7 @@ async function toggleSave(sfxId, btn){
 const loginOverlay = document.getElementById('loginOverlay');
 document.getElementById('modalCloseBtn').onclick = () => loginOverlay.classList.add('hidden');
 document.getElementById('modalGoogleBtn').onclick = async () => {
-  await signIn();
+  await auth.signInWithPopup(googleProvider).catch(err => toast('Sign-in failed: ' + err.message));
   if (auth.currentUser){
     loginOverlay.classList.add('hidden');
     toast('Signed in');
@@ -151,7 +96,7 @@ async function bumpDownloadStat(){
   }catch(e){ /* non-critical */ }
 }
 
-// ---------- Cart (client-side, no payment gateway wired up) ----------
+// ---------- Cart ----------
 function getCart(){
   try{ return JSON.parse(localStorage.getItem('wf-cart') || '[]'); }catch(e){ return []; }
 }
@@ -189,24 +134,45 @@ function renderCartModal(){
   const total = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
   wrap.innerHTML = items.map(i => `
     <div class="cart-item">
-      <div class="info"><b>${escapeHtml(i.name)}</b><span>${i.price ? '$'+i.price : 'Free'}</span></div>
+      <div class="info"><b>${escapeHtml(i.name)}</b><span>${fmtPrice(i.price)}</span></div>
       <button class="btn small danger" data-id="${i.id}">Remove</button>
     </div>
-  `).join('') + `<div class="cart-total"><span>Total</span><span>$${total.toFixed(2)}</span></div>`;
+  `).join('') + `<div class="cart-total"><span>Total</span><span>Tk ${total.toFixed(2)}</span></div>`;
   wrap.querySelectorAll('button[data-id]').forEach(b => b.onclick = () => removeFromCart(b.dataset.id));
   document.getElementById('checkoutBtn').classList.remove('hidden');
 }
-document.getElementById('cartBtn').onclick = () => {
+function openCartModal(){
   renderCartModal();
   document.getElementById('cartOverlay').classList.remove('hidden');
-};
+}
+document.getElementById('cartBtn').addEventListener('click', e => {
+  e.preventDefault();
+  openCartModal();
+});
 document.getElementById('cartCloseBtn').onclick = () => document.getElementById('cartOverlay').classList.add('hidden');
 document.getElementById('checkoutBtn').onclick = openPaymentForm;
 renderCartBadge();
+if (location.hash === '#cart') openCartModal();
 
 // ---------- Payment details form ----------
 const paymentOverlay = document.getElementById('paymentOverlay');
 const paymentForm = document.getElementById('paymentForm');
+
+function renderSellerPayInfo(){
+  const wrap = document.getElementById('sellerPayInfo');
+  const items = getCart();
+  const lines = [];
+  items.forEach(item => {
+    const sfx = allSfx.find(s => s.id === item.id);
+    if (sfx && sfx.paymentMethods && sfx.paymentMethods.length){
+      const methods = sfx.paymentMethods.map(p => `${p.method}: ${p.number}`).join(' · ');
+      lines.push(`<div class="pm-line"><b>${escapeHtml(sfx.name)}</b> — ${escapeHtml(methods)}</div>`);
+    }
+  });
+  wrap.innerHTML = lines.length
+    ? `<div class="seller-pay-list"><b>Send payment to:</b>${lines.join('')}</div>`
+    : '';
+}
 
 function openPaymentForm(){
   if (!getCart().length){ toast('Your cart is empty'); return; }
@@ -221,6 +187,8 @@ function openPaymentForm(){
   document.getElementById('payMethod').value = savedPayment?.method || 'Bkash';
   document.getElementById('payTxnId').value = '';
   document.getElementById('paySaveInfo').checked = !!savedPayment;
+  document.getElementById('payAgreeTerms').checked = false;
+  renderSellerPayInfo();
   document.getElementById('cartOverlay').classList.add('hidden');
   paymentOverlay.classList.remove('hidden');
 }
@@ -230,6 +198,10 @@ paymentForm.addEventListener('submit', async e => {
   e.preventDefault();
   const items = getCart();
   if (!items.length){ toast('Your cart is empty'); paymentOverlay.classList.add('hidden'); return; }
+  if (!document.getElementById('payAgreeTerms').checked){
+    toast('Please agree to the terms & conditions');
+    return;
+  }
 
   const fullName = document.getElementById('payName').value.trim();
   const phone = document.getElementById('payPhone').value.trim();
@@ -251,6 +223,7 @@ paymentForm.addEventListener('submit', async e => {
       total: items.reduce((sum, i) => sum + (Number(i.price) || 0), 0),
       status: 'pending',
       payment: { fullName, phone, email, method, transactionId },
+      agreedTerms: true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -271,7 +244,7 @@ paymentForm.addEventListener('submit', async e => {
   }
 });
 
-// ---------- Data ----------
+// ---------- Library ----------
 let allSfx = [];
 let activeCategory = 'all';
 let searchTerm = '';
@@ -279,7 +252,7 @@ let searchTerm = '';
 const CATEGORY_COLORS = ['#8a6bff','#17d6c4','#ff9f5b','#ff6b9d','#5bd4ff','#c4ff5b','#ff6b6b','#c48aff'];
 function colorFor(cat){
   let hash = 0;
-  for (const c of cat) hash = c.charCodeAt(0) + ((hash << 5) - hash);
+  for (const c of (cat || 'sfx')) hash = c.charCodeAt(0) + ((hash << 5) - hash);
   return CATEGORY_COLORS[Math.abs(hash) % CATEGORY_COLORS.length];
 }
 
@@ -324,7 +297,7 @@ document.getElementById('searchInput').addEventListener('input', e => {
   render();
 });
 
-let activePlayer = null; // currently playing <audio> element
+let activePlayer = null;
 
 function render(){
   const grid = document.getElementById('sfxGrid');
@@ -347,6 +320,7 @@ function render(){
 }
 
 function renderCard(sfx){
+  const isAlbum = sfx.type === 'album';
   const card = document.createElement('div');
   card.className = 'card';
   card.style.setProperty('--cat-color', colorFor(sfx.category || 'sfx'));
@@ -354,31 +328,36 @@ function renderCard(sfx){
   const price = Number(sfx.price) || 0;
   const owned = isAdmin || purchasedIds.includes(sfx.id);
   const downloads = Number(sfx.downloads) || 0;
+  const previewUrl = isAlbum ? sfx.previewUrl : sfx.fileUrl;
 
   const priceLabel = price === 0
     ? '<span class="price free">Free</span>'
     : (owned && !isAdmin)
       ? '<span class="price free">Purchased</span>'
-      : `<span class="price">$${sfx.price}</span>`;
+      : `<span class="price">Tk ${sfx.price}</span>`;
 
   const btnLabel = (price === 0 || owned)
-    ? 'Download'
+    ? (isAlbum ? 'Download album' : 'Download')
     : (getCart().some(i => i.id === sfx.id) ? 'In cart' : 'Add to cart');
 
   card.innerHTML = `
+    ${isAlbum && sfx.coverUrl ? `<img class="card-cover" src="${sfx.coverUrl}" alt="">` : ''}
     <div class="card-top">
       <h3>${escapeHtml(sfx.name || 'Untitled')}</h3>
       <div class="card-actions">
         <button class="save-btn${isSaved ? ' active' : ''}" title="Save" aria-label="Save sound">
           <svg viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
         </button>
-        <span class="tag">${escapeHtml(sfx.category || 'General')}</span>
-        ${sfx.popular ? '<span class="tag popular-tag">🔥 Popular</span>' : ''}
+        <span class="tag-row">
+          <span class="tag">${escapeHtml(sfx.category || 'General')}</span>
+          ${isAlbum ? '<span class="tag album-tag">Album</span>' : ''}
+          ${sfx.popular ? '<span class="tag popular-tag">🔥 Popular</span>' : ''}
+        </span>
       </div>
     </div>
     <p class="desc">${escapeHtml(sfx.description || 'No description provided.')}</p>
 
-    <audio class="raw-audio" preload="none" src="${sfx.fileUrl}"></audio>
+    <audio class="raw-audio" preload="none" src="${previewUrl || ''}"></audio>
     <div class="player">
       <button class="play-btn" aria-label="Play">
         <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
@@ -388,7 +367,7 @@ function renderCard(sfx){
       <span class="time">0:00</span>
     </div>
 
-    <div class="meta-row"><b>Use for:</b> ${escapeHtml(sfx.useFor || '—')}</div>
+    <div class="meta-row">${isAlbum ? `<b>Tracks:</b> ${Number(sfx.totalTracks)||0}` : `<b>Use for:</b> ${escapeHtml(sfx.useFor || '—')}`}</div>
     <div class="download-count">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       ${downloads} download${downloads === 1 ? '' : 's'}
@@ -438,6 +417,7 @@ function wirePlayer(card){
   }
 
   playBtn.addEventListener('click', () => {
+    if (!audio.src){ toast('No preview available'); return; }
     if (activePlayer && activePlayer !== audio){ activePlayer.pause(); }
     if (audio.paused){
       audio.play().catch(() => toast('Could not play this sound'));
@@ -482,16 +462,15 @@ async function handleDownload(sfx, btn){
   btn.textContent = 'Preparing…';
   btn.disabled = true;
   try{
-    const res = await fetch(sfx.fileUrl);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (sfx.name || 'sfx').replace(/[^a-z0-9\-_ ]/gi,'') + guessExt(sfx.fileUrl);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    if (sfx.type === 'album'){
+      const tracks = sfx.trackUrls || [];
+      for (let i = 0; i < tracks.length; i++){
+        await downloadFile(tracks[i], `${sfx.name || 'album'} - Track ${i+1}`.replace(/[^a-z0-9\-_ ]/gi,''));
+        await new Promise(r => setTimeout(r, 400));
+      }
+    } else {
+      await downloadFile(sfx.fileUrl, (sfx.name || 'sfx').replace(/[^a-z0-9\-_ ]/gi,''));
+    }
     toast('Download started');
     bumpDownloadStat();
     bumpSfxDownloadCount(sfx.id);
@@ -503,6 +482,19 @@ async function handleDownload(sfx, btn){
   }
 }
 
+async function downloadFile(fileUrl, baseName){
+  const res = await fetch(fileUrl);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = baseName + guessExt(fileUrl);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function bumpSfxDownloadCount(sfxId){
   try{
     await db.collection('sfx').doc(sfxId).update({
@@ -512,7 +504,7 @@ async function bumpSfxDownloadCount(sfxId){
 }
 
 function guessExt(url){
-  const m = url.split('?')[0].match(/\.(mp3|wav|ogg|m4a|flac)$/i);
+  const m = url.split('?')[0].match(/\.(mp3|wav|ogg|m4a|flac|jpg|png)$/i);
   return m ? m[0] : '.mp3';
 }
 
@@ -520,4 +512,9 @@ function escapeHtml(str){
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function fmtPrice(n){
+  const num = Number(n) || 0;
+  return num === 0 ? 'Free' : `Tk ${num}`;
 }
