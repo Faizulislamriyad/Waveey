@@ -14,6 +14,11 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
+function fmtPrice(n){
+  const num = Number(n) || 0;
+  return num === 0 ? 'Free' : `Tk ${num}`;
+}
+
 // ---------- Elements ----------
 const gateSignedOut = document.getElementById('gateSignedOut');
 const gateChecking = document.getElementById('gateChecking');
@@ -48,18 +53,18 @@ auth.onAuthStateChanged(user => {
     watchAdminRequests();
   } else {
     watchSavedSounds(user.uid);
-    watchMyRequests(user.email);
+    watchMyRequests(user.uid);
     watchMyOrders(user.uid);
     watchCategoryList();
-    initTypeToggle('requestTypeToggle', 'requestSingleFields', 'requestAlbumFields');
+    initTypeToggle('requestTypeToggle', {
+      sfx: 'requestSimpleFields',
+      bgm: 'requestSimpleFields',
+      album: 'requestAlbumFields',
+      pack: 'requestPackFields'
+    });
     initPaymentRows('rqPaymentRows', 'rqAddPayment');
   }
 });
-
-function fmtPrice(n){
-  const num = Number(n) || 0;
-  return num === 0 ? 'Free' : `Tk ${num}`;
-}
 
 // ---------- Admin: sales dashboard ----------
 function watchSalesDashboard(){
@@ -92,7 +97,7 @@ function watchAdminRequests(){
       row.className = 'admin-row';
       row.innerHTML = `
         <div class="info">
-          <b>${escapeHtml(d.name || 'Untitled')} ${d.type === 'album' ? '<span class="badge pending">Album</span>' : ''}</b>
+          <b>${escapeHtml(d.name || 'Untitled')} <span class="badge pending">${(d.type||'sfx').toUpperCase()}</span></b>
           <span>${escapeHtml(d.requestedBy || '—')} · ${fmtPrice(d.price)}</span>
         </div>
         <div style="display:flex;gap:8px">
@@ -138,7 +143,7 @@ function watchSavedSounds(uid){
         row.className = 'admin-row';
         row.innerHTML = `
           <div class="info">
-            <b>${escapeHtml(d.name || 'Untitled')}</b>
+            <b>${escapeHtml(d.name || 'Untitled')} <span class="badge pending">${(d.type||'sfx').toUpperCase()}</span></b>
             <span>${escapeHtml(d.category || 'General')} · ${fmtPrice(d.price)}</span>
           </div>
           <a class="btn ghost small" href="index.html">View</a>
@@ -167,7 +172,8 @@ requestForm.addEventListener('submit', async e => {
 
   const type = getActiveType('requestTypeToggle');
   const copyright = document.getElementById('rqCopyright').value;
-  const paymentMethods = collectPaymentRows('rqPaymentRows');
+  const paymentMethods = requirePaymentRows('rqPaymentRows');
+  if (!paymentMethods) return;
 
   rqSubmitBtn.disabled = true;
   rqProgress.classList.add('show');
@@ -175,7 +181,7 @@ requestForm.addEventListener('submit', async e => {
   rqStatusText.textContent = '';
 
   try{
-    if (type === 'single'){
+    if (type === 'sfx' || type === 'bgm'){
       const file = document.getElementById('rqFile').files[0];
       if (!file){ toast('Choose an audio file first'); throw new Error('no-file'); }
 
@@ -189,7 +195,7 @@ requestForm.addEventListener('submit', async e => {
       const result = await uploadToCloudinary(file, 'video', pct => { rqProgressBar.style.width = pct + '%'; });
 
       await db.collection('requests').add({
-        type: 'single', name, category, description, useFor, price, copyright, paymentMethods,
+        type, name, category, description, useFor, price, copyright, paymentMethods,
         fileUrl: result.secure_url,
         cloudinaryId: result.public_id,
         status: 'pending',
@@ -197,13 +203,14 @@ requestForm.addEventListener('submit', async e => {
         requestedByUid: currentUser.uid,
         requestedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-    } else {
+    } else if (type === 'album'){
       const cover = document.getElementById('rqAlbumCover').files[0];
       const preview = document.getElementById('rqAlbumPreview').files[0];
       const tracks = [...document.getElementById('rqAlbumTracks').files];
       if (!cover || !preview || !tracks.length){ toast('Cover, preview and at least one track are required'); throw new Error('no-file'); }
 
       const name = document.getElementById('rqAlbumName').value.trim();
+      const artistName = document.getElementById('rqAlbumArtist').value.trim();
       const category = document.getElementById('rqAlbumCategory').value.trim();
       const description = document.getElementById('rqAlbumDesc').value.trim();
       const price = Number(document.getElementById('rqAlbumPrice').value) || 0;
@@ -222,8 +229,39 @@ requestForm.addEventListener('submit', async e => {
       }
 
       await db.collection('requests').add({
-        type: 'album', name, category, description, price, copyright, paymentMethods,
+        type: 'album', name, artistName, category, description, price, copyright, paymentMethods,
         coverUrl: coverRes.secure_url,
+        previewUrl: previewRes.secure_url,
+        totalTracks: trackUrls.length,
+        trackUrls,
+        status: 'pending',
+        requestedBy: currentUser.email,
+        requestedByUid: currentUser.uid,
+        requestedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      // pack
+      const preview = document.getElementById('rqPackPreview').files[0];
+      const files = [...document.getElementById('rqPackFiles').files];
+      if (!preview || !files.length){ toast('Preview and at least one sound are required'); throw new Error('no-file'); }
+
+      const name = document.getElementById('rqPackName').value.trim();
+      const category = document.getElementById('rqPackCategory').value.trim();
+      const description = document.getElementById('rqPackDesc').value.trim();
+      const price = Number(document.getElementById('rqPackPrice').value) || 0;
+
+      rqStatusText.textContent = 'Uploading preview…';
+      const previewRes = await uploadToCloudinary(preview, 'video', pct => { rqProgressBar.style.width = pct + '%'; });
+
+      const trackUrls = [];
+      for (let i = 0; i < files.length; i++){
+        rqStatusText.textContent = `Uploading sound ${i+1} of ${files.length}…`;
+        const r = await uploadToCloudinary(files[i], 'video', pct => { rqProgressBar.style.width = pct + '%'; });
+        trackUrls.push(r.secure_url);
+      }
+
+      await db.collection('requests').add({
+        type: 'pack', name, category, description, price, copyright, paymentMethods,
         previewUrl: previewRes.secure_url,
         totalTracks: trackUrls.length,
         trackUrls,
@@ -247,11 +285,13 @@ requestForm.addEventListener('submit', async e => {
   }
 });
 
-// ---------- My requests ----------
+// ---------- My requests (editable/deletable while pending) ----------
 let reqUnsub = null;
-function watchMyRequests(email){
+let myRequestsCache = {};
+function watchMyRequests(uid){
   if (reqUnsub) reqUnsub();
-  reqUnsub = db.collection('requests').where('requestedBy', '==', email).onSnapshot(snap => {
+  reqUnsub = db.collection('requests').where('requestedByUid', '==', uid).onSnapshot(snap => {
+    myRequestsCache = {};
     const list = document.getElementById('myRequests');
     if (snap.empty){
       list.innerHTML = `<div class="admin-row"><div class="info"><b>No requests yet</b><span>Submit a sound above and track its status here.</span></div></div>`;
@@ -261,19 +301,83 @@ function watchMyRequests(email){
     list.innerHTML = '';
     docs.forEach(doc => {
       const d = doc.data();
+      myRequestsCache[doc.id] = d;
+      const isPending = d.status === 'pending';
       const row = document.createElement('div');
       row.className = 'admin-row';
       row.innerHTML = `
         <div class="info">
-          <b>${escapeHtml(d.name || 'Untitled')}</b>
+          <b>${escapeHtml(d.name || 'Untitled')} <span class="badge pending">${(d.type||'sfx').toUpperCase()}</span></b>
           <span>${escapeHtml(d.category || 'General')} · ${fmtPrice(d.price)}</span>
         </div>
-        <span class="badge ${d.status}">${d.status}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge ${d.status}">${d.status}</span>
+          ${isPending ? `<button class="btn ghost small editReqBtn">Edit</button><button class="btn small danger delReqBtn">Delete</button>` : ''}
+        </div>
       `;
+      if (isPending){
+        row.querySelector('.editReqBtn').onclick = () => openReqEditModal(doc.id, d);
+        row.querySelector('.delReqBtn').onclick = () => deleteMyRequest(doc.id);
+      }
       list.appendChild(row);
     });
   });
 }
+
+async function deleteMyRequest(id){
+  if (!confirm('Delete this request? This cannot be undone.')) return;
+  try{
+    await db.collection('requests').doc(id).delete();
+    toast('Request deleted');
+  }catch(e){
+    toast('Delete failed: ' + e.message);
+  }
+}
+
+// ---------- Edit my request modal (text fields only, no file re-upload) ----------
+const reqEditOverlay = document.getElementById('reqEditOverlay');
+const reqEditForm = document.getElementById('reqEditForm');
+let editingReqId = null;
+initPaymentRows('rePaymentRows', 'reAddPayment');
+
+function openReqEditModal(id, d){
+  editingReqId = id;
+  document.getElementById('reName').value = d.name || '';
+  document.getElementById('reCategory').value = d.category || '';
+  document.getElementById('reDesc').value = d.description || '';
+  document.getElementById('reUseFor').value = d.useFor || '';
+  document.getElementById('rePrice').value = d.price || 0;
+  document.getElementById('reCopyright').value = d.copyright || 'None';
+  initPaymentRows('rePaymentRows', 'reAddPayment', d.paymentMethods);
+  reqEditOverlay.classList.remove('hidden');
+}
+document.getElementById('reqEditCancelBtn').onclick = () => reqEditOverlay.classList.add('hidden');
+
+reqEditForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!editingReqId) return;
+  const paymentMethods = requirePaymentRows('rePaymentRows');
+  if (!paymentMethods) return;
+  const submitBtn = reqEditForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try{
+    await db.collection('requests').doc(editingReqId).update({
+      name: document.getElementById('reName').value.trim(),
+      category: document.getElementById('reCategory').value.trim(),
+      description: document.getElementById('reDesc').value.trim(),
+      useFor: document.getElementById('reUseFor').value.trim(),
+      price: Number(document.getElementById('rePrice').value) || 0,
+      copyright: document.getElementById('reCopyright').value,
+      paymentMethods
+    });
+    toast('Request updated');
+    reqEditOverlay.classList.add('hidden');
+  }catch(err){
+    toast('Update failed: ' + err.message);
+  }finally{
+    submitBtn.disabled = false;
+  }
+});
 
 // ---------- My orders ----------
 let orderUnsub = null;

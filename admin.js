@@ -48,6 +48,7 @@ auth.onAuthStateChanged(async user => {
     loadLibrary();
     loadRequests();
     loadOrders();
+    loadSettings();
   } else {
     showOnly(gateDenied);
   }
@@ -62,7 +63,12 @@ function loadCategoryList(){
 }
 
 // ---------- Type toggle + payment rows for the upload form ----------
-initTypeToggle('uploadTypeToggle', 'uploadSingleFields', 'uploadAlbumFields');
+initTypeToggle('uploadTypeToggle', {
+  sfx: 'uploadSimpleFields',
+  bgm: 'uploadSimpleFields',
+  album: 'uploadAlbumFields',
+  pack: 'uploadPackFields'
+});
 initPaymentRows('fPaymentRows', 'fAddPayment');
 
 // ---------- Upload ----------
@@ -81,7 +87,8 @@ form.addEventListener('submit', async e => {
 
   const type = getActiveType('uploadTypeToggle');
   const copyright = document.getElementById('fCopyright').value;
-  const paymentMethods = collectPaymentRows('fPaymentRows');
+  const paymentMethods = requirePaymentRows('fPaymentRows');
+  if (!paymentMethods) return;
 
   uploadBtn.disabled = true;
   progressWrap.classList.add('show');
@@ -89,7 +96,7 @@ form.addEventListener('submit', async e => {
   uploadStatusText.textContent = '';
 
   try{
-    if (type === 'single'){
+    if (type === 'sfx' || type === 'bgm'){
       const file = document.getElementById('fFile').files[0];
       if (!file){ toast('Choose an audio file first'); throw new Error('no-file'); }
 
@@ -103,20 +110,22 @@ form.addEventListener('submit', async e => {
       const result = await uploadToCloudinary(file, 'video', pct => { progressBar.style.width = pct + '%'; });
 
       await db.collection('sfx').add({
-        type: 'single', name, category, description, useFor, price, copyright, paymentMethods,
+        type, name, category, description, useFor, price, copyright, paymentMethods,
         fileUrl: result.secure_url,
         cloudinaryId: result.public_id,
         downloads: 0,
+        source: 'admin',
         uploadedBy: currentUser.email,
         uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-    } else {
+    } else if (type === 'album'){
       const cover = document.getElementById('fAlbumCover').files[0];
       const preview = document.getElementById('fAlbumPreview').files[0];
       const tracks = [...document.getElementById('fAlbumTracks').files];
       if (!cover || !preview || !tracks.length){ toast('Cover, preview and at least one track are required'); throw new Error('no-file'); }
 
       const name = document.getElementById('fAlbumName').value.trim();
+      const artistName = document.getElementById('fAlbumArtist').value.trim();
       const category = document.getElementById('fAlbumCategory').value.trim();
       const description = document.getElementById('fAlbumDesc').value.trim();
       const price = Number(document.getElementById('fAlbumPrice').value) || 0;
@@ -135,18 +144,50 @@ form.addEventListener('submit', async e => {
       }
 
       await db.collection('sfx').add({
-        type: 'album', name, category, description, price, copyright, paymentMethods,
+        type: 'album', name, artistName, category, description, price, copyright, paymentMethods,
         coverUrl: coverRes.secure_url,
         previewUrl: previewRes.secure_url,
         totalTracks: trackUrls.length,
         trackUrls,
         downloads: 0,
+        source: 'admin',
+        uploadedBy: currentUser.email,
+        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } else {
+      // pack
+      const preview = document.getElementById('fPackPreview').files[0];
+      const files = [...document.getElementById('fPackFiles').files];
+      if (!preview || !files.length){ toast('Preview and at least one sound are required'); throw new Error('no-file'); }
+
+      const name = document.getElementById('fPackName').value.trim();
+      const category = document.getElementById('fPackCategory').value.trim();
+      const description = document.getElementById('fPackDesc').value.trim();
+      const price = Number(document.getElementById('fPackPrice').value) || 0;
+
+      uploadStatusText.textContent = 'Uploading preview…';
+      const previewRes = await uploadToCloudinary(preview, 'video', pct => { progressBar.style.width = pct + '%'; });
+
+      const trackUrls = [];
+      for (let i = 0; i < files.length; i++){
+        uploadStatusText.textContent = `Uploading sound ${i+1} of ${files.length}…`;
+        const r = await uploadToCloudinary(files[i], 'video', pct => { progressBar.style.width = pct + '%'; });
+        trackUrls.push(r.secure_url);
+      }
+
+      await db.collection('sfx').add({
+        type: 'pack', name, category, description, price, copyright, paymentMethods,
+        previewUrl: previewRes.secure_url,
+        totalTracks: trackUrls.length,
+        trackUrls,
+        downloads: 0,
+        source: 'admin',
         uploadedBy: currentUser.email,
         uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     }
 
-    toast('Sound uploaded');
+    toast('Uploaded');
     form.reset();
     initPaymentRows('fPaymentRows', 'fAddPayment');
   }catch(err){
@@ -159,26 +200,48 @@ form.addEventListener('submit', async e => {
   }
 });
 
-// ---------- Library (with edit) ----------
-let libraryCache = {};
+// ---------- Site settings ----------
+function loadSettings(){
+  db.collection('settings').doc('site').get().then(doc => {
+    const d = doc.exists ? doc.data() : {};
+    document.getElementById('stNews').value = d.newsText || '';
+    document.getElementById('stVersion').value = d.version || 'Version : 2.00 Waveform SFX Library by Faizul Islam Riyad';
+  });
+}
+document.getElementById('stSaveBtn').onclick = async () => {
+  const btn = document.getElementById('stSaveBtn');
+  btn.disabled = true;
+  try{
+    await db.collection('settings').doc('site').set({
+      newsText: document.getElementById('stNews').value.trim(),
+      version: document.getElementById('stVersion').value.trim()
+    }, { merge: true });
+    toast('Settings saved');
+  }catch(e){
+    toast('Save failed: ' + e.message);
+  }finally{
+    btn.disabled = false;
+  }
+};
+
+// ---------- Library (admin-uploaded only, with edit) ----------
 function loadLibrary(){
   db.collection('sfx').orderBy('uploadedAt', 'desc').onSnapshot(snap => {
     const list = document.getElementById('libList');
-    document.getElementById('libCount').textContent = snap.size;
-    libraryCache = {};
-    if (snap.empty){
+    const adminDocs = snap.docs.filter(d => (d.data().source || 'admin') === 'admin');
+    document.getElementById('libCount').textContent = adminDocs.length;
+    if (!adminDocs.length){
       list.innerHTML = `<div class="admin-row"><div class="info"><b>No sounds yet</b><span>Upload your first one above.</span></div></div>`;
       return;
     }
     list.innerHTML = '';
-    snap.forEach(doc => {
+    adminDocs.forEach(doc => {
       const d = doc.data();
-      libraryCache[doc.id] = d;
       const row = document.createElement('div');
       row.className = 'admin-row';
       row.innerHTML = `
         <div class="info">
-          <b>${escapeHtml(d.name || 'Untitled')} ${d.type === 'album' ? '<span class="badge pending">Album</span>' : ''}</b>
+          <b>${escapeHtml(d.name || 'Untitled')} <span class="badge pending">${(d.type||'sfx').toUpperCase()}</span></b>
           <span>${escapeHtml(d.category || 'General')} · ${fmtPrice(d.price)} · ${d.downloads||0} downloads · by ${escapeHtml(d.uploadedBy || '—')}</span>
         </div>
         <div style="display:flex;gap:8px">
@@ -225,6 +288,8 @@ document.getElementById('editCancelBtn').onclick = () => editOverlay.classList.a
 editForm.addEventListener('submit', async e => {
   e.preventDefault();
   if (!editingId) return;
+  const paymentMethods = requirePaymentRows('ePaymentRows');
+  if (!paymentMethods) return;
   const submitBtn = editForm.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   try{
@@ -235,7 +300,7 @@ editForm.addEventListener('submit', async e => {
       useFor: document.getElementById('eUseFor').value.trim(),
       price: Number(document.getElementById('ePrice').value) || 0,
       copyright: document.getElementById('eCopyright').value,
-      paymentMethods: collectPaymentRows('ePaymentRows')
+      paymentMethods
     });
     toast('Sound updated');
     editOverlay.classList.add('hidden');
@@ -261,23 +326,34 @@ function loadOrders(){
     list.innerHTML = '';
     docs.forEach(doc => {
       const d = doc.data();
-      const row = document.createElement('div');
-      row.className = 'panel';
-      row.style.cssText = 'padding:16px;margin-bottom:14px;background:var(--glass-strong)';
-      const itemsHtml = (d.items || []).map(i => `${escapeHtml(i.name)} — ${fmtPrice(i.price)}`).join('<br>');
       const p = d.payment || {};
+      const row = document.createElement('div');
+      row.className = 'order-card';
       row.innerHTML = `
-        <div class="sub" style="margin-bottom:6px">Requested by ${escapeHtml(d.userName || d.userEmail || '—')} (${escapeHtml(d.userEmail || '—')})</div>
-        <div class="order-items">${itemsHtml}</div>
-        <div style="font-weight:700;margin:8px 0">Total: Tk ${(d.total || 0).toFixed(2)}</div>
-        <div class="order-payment">
-          <div><b>Name:</b> ${escapeHtml(p.fullName || '—')}</div>
-          <div><b>Phone:</b> ${escapeHtml(p.phone || '—')}</div>
-          <div><b>Email:</b> ${escapeHtml(p.email || '—')}</div>
-          <div><b>Method:</b> ${escapeHtml(p.method || '—')}</div>
-          <div><b>Transaction ID:</b> ${escapeHtml(p.transactionId || '—')}</div>
+        <div class="order-card-head">
+          <div>
+            <b>${escapeHtml(d.userName || d.userEmail || '—')}</b>
+            <span>${escapeHtml(d.userEmail || '—')}</span>
+          </div>
+          <div class="order-total">Tk ${(d.total || 0).toFixed(2)}</div>
         </div>
-        <div style="display:flex;gap:10px;margin-top:10px">
+        <div class="order-card-body">
+          <div class="order-section">
+            <h4>Items</h4>
+            <ul>${(d.items || []).map(i => `<li>${escapeHtml(i.name)} — ${fmtPrice(i.price)}</li>`).join('')}</ul>
+          </div>
+          <div class="order-section">
+            <h4>Payment info</h4>
+            <dl>
+              <dt>Name</dt><dd>${escapeHtml(p.fullName || '—')}</dd>
+              <dt>Phone</dt><dd>${escapeHtml(p.phone || '—')}</dd>
+              <dt>Email</dt><dd>${escapeHtml(p.email || '—')}</dd>
+              <dt>Method</dt><dd>${escapeHtml(p.method || '—')}</dd>
+              <dt>Txn ID</dt><dd>${escapeHtml(p.transactionId || '—')}</dd>
+            </dl>
+          </div>
+        </div>
+        <div class="order-card-actions">
           <button class="btn primary small approveBtn">Approve</button>
           <button class="btn danger small rejectBtn">Reject</button>
         </div>
@@ -335,7 +411,8 @@ function loadRequests(){
     list.innerHTML = '';
     docs.forEach(doc => {
       const d = doc.data();
-      const isAlbum = d.type === 'album';
+      const type = d.type || 'sfx';
+      const isBundle = type === 'album' || type === 'pack';
       const row = document.createElement('div');
       row.className = 'panel';
       row.style.cssText = 'padding:16px;margin-bottom:14px;background:var(--glass-strong)';
@@ -345,16 +422,17 @@ function loadRequests(){
 
       row.innerHTML = `
         <div class="sub" style="margin-bottom:10px">
-          Submitted by ${escapeHtml(d.requestedBy || '—')} ${isAlbum ? '<span class="badge pending">Album</span>' : ''} · ${fmtPrice(d.price)} · Copyright: ${escapeHtml(d.copyright || 'None')}
+          Submitted by ${escapeHtml(d.requestedBy || '—')} · <span class="badge pending">${type.toUpperCase()}</span> · ${fmtPrice(d.price)} · Copyright: ${escapeHtml(d.copyright || 'None')}
         </div>
 
-        ${isAlbum ? `
+        ${isBundle ? `
           <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap">
             ${d.coverUrl ? `<img src="${d.coverUrl}" alt="" style="width:80px;height:80px;border-radius:10px;object-fit:cover">` : ''}
             <div style="flex:1;min-width:180px">
+              ${d.artistName ? `<div class="sub" style="margin-bottom:4px">Artist: ${escapeHtml(d.artistName)}</div>` : ''}
               <div class="sub" style="margin-bottom:4px">Preview (public sample):</div>
               <audio controls preload="none" src="${d.previewUrl||''}" style="width:100%;height:36px"></audio>
-              <div class="sub" style="margin:6px 0 0">${d.totalTracks||0} track(s) in this album</div>
+              <div class="sub" style="margin:6px 0 0">${d.totalTracks||0} file(s) in this ${type}</div>
             </div>
           </div>
         ` : `
@@ -389,22 +467,26 @@ async function approveRequest(id, d, rowId, row){
     const name = document.getElementById(`${rowId}-name`).value.trim();
     const category = document.getElementById(`${rowId}-category`).value.trim();
     const description = document.getElementById(`${rowId}-desc`).value.trim();
+    const type = d.type || 'sfx';
 
     const published = {
-      type: d.type || 'single',
-      name, category, description,
+      type, name, category, description,
       price: d.price || 0,
       copyright: d.copyright || 'None',
       paymentMethods: d.paymentMethods || [],
       downloads: 0,
+      source: 'user',
       uploadedBy: d.requestedBy || 'user request',
       uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    if (published.type === 'album'){
-      published.coverUrl = d.coverUrl;
+    if (type === 'album' || type === 'pack'){
       published.previewUrl = d.previewUrl;
       published.totalTracks = d.totalTracks || 0;
       published.trackUrls = d.trackUrls || [];
+      if (type === 'album'){
+        published.coverUrl = d.coverUrl;
+        published.artistName = d.artistName || '';
+      }
     } else {
       published.useFor = d.useFor || '';
       published.fileUrl = d.fileUrl;

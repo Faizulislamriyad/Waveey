@@ -39,23 +39,51 @@ function collectPaymentRows(containerId){
     .filter(p => p.number);
 }
 
-function initTypeToggle(toggleId, singleFieldsId, albumFieldsId){
+// Payment method + number is mandatory on every upload/request/edit form.
+// Returns true and does nothing if valid; shows a toast and returns false otherwise.
+function requirePaymentRows(containerId){
+  const list = collectPaymentRows(containerId);
+  if (!list.length){
+    if (typeof toast === 'function') toast('Add at least one payment method and number');
+    return false;
+  }
+  return true;
+}
+
+// Generic Single/BGM/Album/Pack toggle. fieldsMap maps each button's
+// data-type to the id of the field block it should reveal (multiple types
+// can share the same block, e.g. sfx/bgm both show "uploadSimpleFields").
+function initTypeToggle(toggleId, fieldsMap){
   const toggle = document.getElementById(toggleId);
   if (!toggle) return;
-  toggle.querySelectorAll('button').forEach(btn => {
-    btn.onclick = () => {
-      toggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const type = btn.dataset.type;
-      document.getElementById(singleFieldsId).classList.toggle('hidden', type !== 'single');
-      document.getElementById(albumFieldsId).classList.toggle('hidden', type !== 'album');
-    };
-  });
+  const buttons = [...toggle.querySelectorAll('button')];
+  const allFieldIds = [...new Set(Object.values(fieldsMap || {}))];
+
+  function activate(btn){
+    buttons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const targetId = fieldsMap ? fieldsMap[btn.dataset.type] : null;
+    allFieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('hidden', id !== targetId);
+    });
+  }
+
+  buttons.forEach(btn => btn.addEventListener('click', () => activate(btn)));
+
+  const initial = toggle.querySelector('button.active') || buttons[0];
+  if (initial) activate(initial);
 }
 
 function getActiveType(toggleId){
   const active = document.querySelector(`#${toggleId} button.active`);
-  return active ? active.dataset.type : 'single';
+  return active ? active.dataset.type : 'sfx';
+}
+
+// Treats the legacy "single" type (from before the SFX/BGM/Album/Pack
+// rename) as "sfx" everywhere.
+function normalizeType(t){
+  return t === 'single' ? 'sfx' : (t || 'sfx');
 }
 
 function fmtPrice(n){
@@ -63,7 +91,7 @@ function fmtPrice(n){
   return num === 0 ? 'Free' : `Tk ${num}`;
 }
 
-// Generic Cloudinary upload (used for audio, cover images, and album tracks).
+// Generic Cloudinary upload (used for audio, cover images, and multi-track uploads).
 // resourceType: 'video' for audio files, 'image' for cover images.
 function uploadToCloudinary(file, resourceType, onProgress){
   return new Promise((resolve, reject) => {

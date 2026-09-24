@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Waveey — Sound Effects Library</title>
 <link rel="icon" type="image/png" href="icon.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,6 +18,9 @@
     Waveey
   </a>
   <div class="nav-actions">
+    <a class="icon-btn" href="index.html" aria-label="Home" title="Home">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </a>
     <a class="icon-btn" href="profile.html" id="profileLink" aria-label="Profile" title="Profile">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     </a>
@@ -28,34 +32,62 @@
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       <span class="cart-badge hidden" id="cartBadge">0</span>
     </a>
+    <button type="button" class="icon-btn hidden" id="signOutBtn" aria-label="Sign out" title="Sign out">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
     <div id="authArea"></div>
   </div>
 </nav>
 
+<div class="ticker-wrap hidden" id="tickerWrap">
+  <div class="ticker" id="tickerText"><i class="fas fa-bullhorn"></i></div>
+</div>
+
 <section class="dashboard">
   <div class="dashboard-grid">
     <div class="stat-card" style="--stat-color:#8a6bff">
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-      <div><b id="statSounds">0</b><span>Total sounds</span></div>
+      <div class="icon"><i class="fas fa-wave-square" style="font-size:18px"></i></div>
+      <div><b id="statSfx">0</b><span>SFX</span></div>
+    </div>
+    <div class="stat-card" style="--stat-color:#5bd4ff">
+      <div class="icon"><i class="fas fa-music" style="font-size:18px"></i></div>
+      <div><b id="statBgm">0</b><span>BGM</span></div>
+    </div>
+    <div class="stat-card" style="--stat-color:#c48aff">
+      <div class="icon"><i class="fas fa-record-vinyl" style="font-size:18px"></i></div>
+      <div><b id="statAlbum">0</b><span>Albums</span></div>
+    </div>
+    <div class="stat-card" style="--stat-color:#ff6b9d">
+      <div class="icon"><i class="fas fa-box-open" style="font-size:18px"></i></div>
+      <div><b id="statPack">0</b><span>Packs</span></div>
     </div>
     <div class="stat-card" style="--stat-color:#17d6c4">
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-      <div><b id="statUsers">0</b><span>Total users</span></div>
+      <div class="icon"><i class="fas fa-users" style="font-size:18px"></i></div>
+      <div><b id="statUsers">0</b><span>Users</span></div>
     </div>
     <div class="stat-card" style="--stat-color:#ff9f5b">
-      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
-      <div><b id="statDownloads">0</b><span>Total downloads</span></div>
+      <div class="icon"><i class="fas fa-download" style="font-size:18px"></i></div>
+      <div><b id="statDownloads">0</b><span>Downloads</span></div>
     </div>
   </div>
 </section>
 
 <div class="toolbar">
-  <div class="search-wrap">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" id="searchInput" placeholder="Search sound effects…">
+  <div class="toolbar-row1">
+    <div class="type-menu" id="typeMenu">
+      <button class="active" data-type="all">All</button>
+      <button data-type="sfx">SFX</button>
+      <button data-type="bgm">BGM</button>
+      <button data-type="album">Album</button>
+      <button data-type="pack">Pack</button>
+    </div>
+    <div class="search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="Search…">
+    </div>
   </div>
   <div class="chip-row" id="categoryChips">
-    <button class="chip active" data-cat="all">All</button>
+    <button class="chip active" data-cat="all">All categories</button>
   </div>
 </div>
 
@@ -63,7 +95,7 @@
   <div class="empty"><b>Loading library…</b>Fetching sounds from the cloud.</div>
 </main>
 
-<footer>Version : 2.00 Waveform SFX Library by Faizul Islam Riyad</footer>
+<footer id="siteFooter">Version : 2.00 Waveform SFX Library by Faizul Islam Riyad</footer>
 
 <!-- Sign-in required modal -->
 <div class="overlay hidden" id="loginOverlay">

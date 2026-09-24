@@ -96,6 +96,22 @@ async function bumpDownloadStat(){
   }catch(e){ /* non-critical */ }
 }
 
+// ---------- Site settings: news ticker + version ----------
+db.collection('settings').doc('site').onSnapshot(doc => {
+  const d = doc.exists ? doc.data() : {};
+  const tickerWrap = document.getElementById('tickerWrap');
+  const tickerText = document.getElementById('tickerText');
+  if (d.newsText){
+    tickerText.innerHTML = `<i class="fas fa-bullhorn"></i>${escapeHtml(d.newsText)}`;
+    tickerWrap.classList.remove('hidden');
+  } else {
+    tickerWrap.classList.add('hidden');
+  }
+  if (d.version){
+    document.getElementById('siteFooter').textContent = d.version;
+  }
+});
+
 // ---------- Cart ----------
 function getCart(){
   try{ return JSON.parse(localStorage.getItem('wf-cart') || '[]'); }catch(e){ return []; }
@@ -246,6 +262,7 @@ paymentForm.addEventListener('submit', async e => {
 
 // ---------- Library ----------
 let allSfx = [];
+let activeType = 'all';
 let activeCategory = 'all';
 let searchTerm = '';
 
@@ -259,12 +276,20 @@ function colorFor(cat){
 db.collection('sfx').orderBy('uploadedAt', 'desc').onSnapshot(snap => {
   allSfx = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   markPopular(allSfx);
-  document.getElementById('statSounds').textContent = allSfx.length;
+  updateTypeCounts();
   buildCategoryChips();
   render();
 }, err => {
   document.getElementById('sfxGrid').innerHTML = `<div class="empty"><b>Couldn't load the library</b>${err.message}</div>`;
 });
+
+function updateTypeCounts(){
+  const count = t => allSfx.filter(s => (s.type || 'sfx') === t).length;
+  document.getElementById('statSfx').textContent = count('sfx');
+  document.getElementById('statBgm').textContent = count('bgm');
+  document.getElementById('statAlbum').textContent = count('album');
+  document.getElementById('statPack').textContent = count('pack');
+}
 
 function markPopular(list){
   const withDownloads = list.filter(s => Number(s.downloads) > 0);
@@ -273,13 +298,23 @@ function markPopular(list){
   list.forEach(s => { s.popular = topIds.has(s.id); });
 }
 
+// ---------- Type menu ----------
+document.querySelectorAll('#typeMenu button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#typeMenu button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeType = btn.dataset.type;
+    render();
+  });
+});
+
 function buildCategoryChips(){
   const cats = [...new Set(allSfx.map(s => s.category).filter(Boolean))];
   const row = document.getElementById('categoryChips');
   row.innerHTML = '';
   const allChip = document.createElement('button');
   allChip.className = 'chip' + (activeCategory === 'all' ? ' active' : '');
-  allChip.textContent = 'All';
+  allChip.textContent = 'All categories';
   allChip.onclick = () => { activeCategory = 'all'; buildCategoryChips(); render(); };
   row.appendChild(allChip);
 
@@ -302,6 +337,7 @@ let activePlayer = null;
 function render(){
   const grid = document.getElementById('sfxGrid');
   let list = allSfx;
+  if (activeType !== 'all') list = list.filter(s => (s.type || 'sfx') === activeType);
   if (activeCategory !== 'all') list = list.filter(s => s.category === activeCategory);
   if (searchTerm) list = list.filter(s =>
     (s.name||'').toLowerCase().includes(searchTerm) ||
@@ -314,13 +350,21 @@ function render(){
     return;
   }
 
+  // Popular sounds always float to the top (stable sort keeps upload-date order otherwise)
+  list = [...list].sort((a, b) => (b.popular ? 1 : 0) - (a.popular ? 1 : 0));
+
   activePlayer = null;
   grid.innerHTML = '';
   list.forEach(sfx => grid.appendChild(renderCard(sfx)));
 }
 
+function typeLabel(type){
+  return { sfx: 'SFX', bgm: 'BGM', album: 'Album', pack: 'Pack' }[type] || 'SFX';
+}
+
 function renderCard(sfx){
-  const isAlbum = sfx.type === 'album';
+  const type = sfx.type || 'sfx';
+  const isBundle = type === 'album' || type === 'pack';
   const card = document.createElement('div');
   card.className = 'card';
   card.style.setProperty('--cat-color', colorFor(sfx.category || 'sfx'));
@@ -328,7 +372,7 @@ function renderCard(sfx){
   const price = Number(sfx.price) || 0;
   const owned = isAdmin || purchasedIds.includes(sfx.id);
   const downloads = Number(sfx.downloads) || 0;
-  const previewUrl = isAlbum ? sfx.previewUrl : sfx.fileUrl;
+  const previewUrl = isBundle ? sfx.previewUrl : sfx.fileUrl;
 
   const priceLabel = price === 0
     ? '<span class="price free">Free</span>'
@@ -337,11 +381,20 @@ function renderCard(sfx){
       : `<span class="price">Tk ${sfx.price}</span>`;
 
   const btnLabel = (price === 0 || owned)
-    ? (isAlbum ? 'Download album' : 'Download')
+    ? (isBundle ? `Download ${typeLabel(type).toLowerCase()}` : 'Download')
     : (getCart().some(i => i.id === sfx.id) ? 'In cart' : 'Add to cart');
 
+  let metaHtml;
+  if (type === 'album'){
+    metaHtml = `<b>Artist:</b> ${escapeHtml(sfx.artistName || '—')} &nbsp;·&nbsp; <b>Tracks:</b> ${Number(sfx.totalTracks)||0}`;
+  } else if (type === 'pack'){
+    metaHtml = `<b>Sounds:</b> ${Number(sfx.totalTracks)||0}`;
+  } else {
+    metaHtml = `<b>Use for:</b> ${escapeHtml(sfx.useFor || '—')}`;
+  }
+
   card.innerHTML = `
-    ${isAlbum && sfx.coverUrl ? `<img class="card-cover" src="${sfx.coverUrl}" alt="">` : ''}
+    ${type === 'album' && sfx.coverUrl ? `<img class="card-cover" src="${sfx.coverUrl}" alt="">` : ''}
     <div class="card-top">
       <h3>${escapeHtml(sfx.name || 'Untitled')}</h3>
       <div class="card-actions">
@@ -350,8 +403,8 @@ function renderCard(sfx){
         </button>
         <span class="tag-row">
           <span class="tag">${escapeHtml(sfx.category || 'General')}</span>
-          ${isAlbum ? '<span class="tag album-tag">Album</span>' : ''}
-          ${sfx.popular ? '<span class="tag popular-tag">🔥 Popular</span>' : ''}
+          <span class="tag album-tag">${typeLabel(type)}</span>
+          ${sfx.popular ? '<span class="tag popular-tag"><i class="fas fa-fire"></i>Popular</span>' : ''}
         </span>
       </div>
     </div>
@@ -367,7 +420,7 @@ function renderCard(sfx){
       <span class="time">0:00</span>
     </div>
 
-    <div class="meta-row">${isAlbum ? `<b>Tracks:</b> ${Number(sfx.totalTracks)||0}` : `<b>Use for:</b> ${escapeHtml(sfx.useFor || '—')}`}</div>
+    <div class="meta-row">${metaHtml}</div>
     <div class="download-count">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       ${downloads} download${downloads === 1 ? '' : 's'}
@@ -444,6 +497,8 @@ function wirePlayer(card){
 }
 
 async function handleDownload(sfx, btn){
+  const type = sfx.type || 'sfx';
+  const isBundle = type === 'album' || type === 'pack';
   const price = Number(sfx.price) || 0;
   const owned = isAdmin || purchasedIds.includes(sfx.id);
 
@@ -462,10 +517,10 @@ async function handleDownload(sfx, btn){
   btn.textContent = 'Preparing…';
   btn.disabled = true;
   try{
-    if (sfx.type === 'album'){
+    if (isBundle){
       const tracks = sfx.trackUrls || [];
       for (let i = 0; i < tracks.length; i++){
-        await downloadFile(tracks[i], `${sfx.name || 'album'} - Track ${i+1}`.replace(/[^a-z0-9\-_ ]/gi,''));
+        await downloadFile(tracks[i], `${sfx.name || type} - ${i+1}`.replace(/[^a-z0-9\-_ ]/gi,''));
         await new Promise(r => setTimeout(r, 400));
       }
     } else {

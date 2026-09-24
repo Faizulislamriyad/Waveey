@@ -17,6 +17,9 @@
     Waveey
   </a>
   <div class="nav-actions">
+    <a class="icon-btn" href="index.html" aria-label="Home" title="Home">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </a>
     <a class="icon-btn" href="profile.html" id="profileLink" aria-label="Profile" title="Profile">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     </a>
@@ -28,6 +31,9 @@
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       <span class="cart-badge hidden" id="cartBadge">0</span>
     </a>
+    <button type="button" class="icon-btn hidden" id="signOutBtn" aria-label="Sign out" title="Sign out">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </button>
     <div id="authArea"></div>
   </div>
 </nav>
@@ -59,15 +65,17 @@
     <div class="sub">Fill in the details, attach the audio, then upload.</div>
 
     <div class="type-toggle" id="uploadTypeToggle">
-      <button type="button" class="active" data-type="single">Single</button>
+      <button type="button" class="active" data-type="sfx">SFX</button>
+      <button type="button" data-type="bgm">BGM</button>
       <button type="button" data-type="album">Album</button>
+      <button type="button" data-type="pack">Pack</button>
     </div>
 
     <form id="uploadForm">
-      <div id="uploadSingleFields">
+      <div id="uploadSimpleFields">
         <div class="form-grid">
           <div class="field">
-            <label>Sound name</label>
+            <label>Name</label>
             <input type="text" id="fName" placeholder="e.g. Deep Whoosh Transition">
           </div>
           <div class="field">
@@ -101,6 +109,10 @@
             <input type="text" id="fAlbumName" placeholder="e.g. Ambient Rain Pack">
           </div>
           <div class="field">
+            <label>Artist name</label>
+            <input type="text" id="fAlbumArtist" placeholder="e.g. Studio Waveey">
+          </div>
+          <div class="field">
             <label>Category</label>
             <input type="text" id="fAlbumCategory" list="categoryList" placeholder="e.g. Ambience">
           </div>
@@ -117,12 +129,41 @@
             <input type="file" id="fAlbumPreview" accept="audio/*">
           </div>
           <div class="field full">
-            <label>Album tracks (all songs in the album)</label>
+            <label>Album tracks (all songs)</label>
             <input type="file" id="fAlbumTracks" accept="audio/*" multiple>
           </div>
           <div class="field">
             <label>Price (0 for free, Tk)</label>
             <input type="number" id="fAlbumPrice" min="0" step="0.01" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div id="uploadPackFields" class="hidden">
+        <div class="form-grid">
+          <div class="field">
+            <label>Pack name</label>
+            <input type="text" id="fPackName" placeholder="e.g. UI Click Pack Vol.1">
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input type="text" id="fPackCategory" list="categoryList" placeholder="e.g. UI">
+          </div>
+          <div class="field full">
+            <label>Description</label>
+            <textarea id="fPackDesc" placeholder="What's in this pack?"></textarea>
+          </div>
+          <div class="field">
+            <label>Preview music (public sample, free to listen)</label>
+            <input type="file" id="fPackPreview" accept="audio/*">
+          </div>
+          <div class="field full">
+            <label>Pack SFX (all sounds in the pack)</label>
+            <input type="file" id="fPackFiles" accept="audio/*" multiple>
+          </div>
+          <div class="field">
+            <label>Price (0 for free, Tk)</label>
+            <input type="number" id="fPackPrice" min="0" step="0.01" value="0">
           </div>
         </div>
       </div>
@@ -146,8 +187,24 @@
       <div class="progress" id="uploadProgress"><i id="uploadProgressBar"></i></div>
       <div class="sub" id="uploadStatusText" style="margin:8px 0 0"></div>
 
-      <button type="submit" class="btn primary" style="margin-top:18px" id="uploadBtn">Upload sound</button>
+      <button type="submit" class="btn primary" style="margin-top:18px" id="uploadBtn">Upload</button>
     </form>
+  </div>
+
+  <div class="panel">
+    <h2>Site settings</h2>
+    <div class="sub">Controls the scrolling news ticker and version text shown on the home page.</div>
+    <div class="settings-grid">
+      <div class="field">
+        <label>Scrolling news text</label>
+        <input type="text" id="stNews" placeholder="e.g. New Ambient pack just dropped!">
+      </div>
+      <div class="field">
+        <label>Version / footer text</label>
+        <input type="text" id="stVersion" placeholder="e.g. Version : 2.00 Waveform SFX Library by Faizul Islam Riyad">
+      </div>
+      <button class="btn primary" id="stSaveBtn" style="width:fit-content">Save settings</button>
+    </div>
   </div>
 
   <div class="panel">
@@ -158,13 +215,13 @@
 
   <div class="panel">
     <h2>Upload requests</h2>
-    <div class="sub"><span id="reqCount">0</span> pending — you can edit the name, description and category before approving. The sound file and price stay as the user submitted them.</div>
+    <div class="sub"><span id="reqCount">0</span> pending — you can edit the name, description and category before approving. The sound file and price stay as the user submitted them. Approved requests publish straight to the public library but won't appear in the Library list below (that list is for sounds uploaded directly by admins).</div>
     <div id="requestsList"></div>
   </div>
 
   <div class="panel">
     <h2>Library</h2>
-    <div class="sub"><span id="libCount">0</span> sounds uploaded</div>
+    <div class="sub"><span id="libCount">0</span> sounds uploaded directly by admins</div>
     <div id="libList"></div>
   </div>
 
