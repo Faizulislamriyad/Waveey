@@ -10,11 +10,15 @@ function paymentRowEl(method, number){
       <option value="Nogod">Nogod</option>
       <option value="Roket">Roket</option>
     </select>
-    <input type="text" class="pm-number" placeholder="Number">
+    <input type="tel" class="pm-number" placeholder="11 digit number" inputmode="numeric" maxlength="11">
     <button type="button" class="pm-remove" aria-label="Remove">✕</button>
   `;
   row.querySelector('.pm-method').value = method || 'Bkash';
   row.querySelector('.pm-number').value = number || '';
+  const numberInput = row.querySelector('.pm-number');
+  numberInput.addEventListener('input', () => {
+    numberInput.value = numberInput.value.replace(/\D/g, '').slice(0, 11);
+  });
   row.querySelector('.pm-remove').onclick = () => row.remove();
   return row;
 }
@@ -39,15 +43,21 @@ function collectPaymentRows(containerId){
     .filter(p => p.number);
 }
 
-// Payment method + number is mandatory on every upload/request/edit form.
-// Returns true and does nothing if valid; shows a toast and returns false otherwise.
+// Payment method + number is mandatory on every upload/request/edit form,
+// and every number must be exactly 11 digits (Bkash/Nogod/Roket format).
+// Returns the collected list if valid; shows a toast and returns false otherwise.
 function requirePaymentRows(containerId){
   const list = collectPaymentRows(containerId);
   if (!list.length){
     if (typeof toast === 'function') toast('Add at least one payment method and number');
     return false;
   }
-  return true;
+  const bad = list.find(p => !/^\d{11}$/.test(p.number));
+  if (bad){
+    if (typeof toast === 'function') toast(`${bad.method} number must be exactly 11 digits`);
+    return false;
+  }
+  return list;
 }
 
 // Generic Single/BGM/Album/Pack toggle. fieldsMap maps each button's
